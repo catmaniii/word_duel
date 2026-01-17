@@ -167,6 +167,13 @@ function App() {
       return;
     }
 
+    // 1b. Check if word is same as source word
+    if (word === sourceWord.toUpperCase()) {
+      setStatusMsg(`Cannot use the source word "${word}" itself!`);
+      playSound('error');
+      return;
+    }
+
     // 2. Check Construction
     if (!canConstruct(word, sourceWord)) {
       setStatusMsg(`Cannot construct "${word}" from source letters!`);
