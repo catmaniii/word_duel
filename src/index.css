@@ -1,0 +1,152 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  --color-bg-player1: #FFF0F0;
+  --color-accent-player1: #FF8080;
+  --color-bg-player2: #F0F8FF;
+  --color-accent-player2: #80B0FF;
+
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  transition: background-color 0.8s ease-in-out;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
+  padding: 2rem;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .desktop-sidebar {
+    display: none !important;
+  }
+
+  .mobile-log-btn {
+    display: inline-block !important;
+  }
+
+  .mobile-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .mobile-sidebar-content {
+    background: white;
+    width: 70%;
+    height: 100%;
+    padding: 1rem;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  /* Mobile Source Word: Center and ensure readability */
+  .source-word-display {
+    width: 100%;
+    text-align: center;
+    font-size: clamp(1.5rem, 5vw, 2.5rem) !important;
+    /* Scale font size */
+    margin: 0.5rem 0;
+    line-height: 1.2;
+    order: 3;
+    /* Move below buttons */
+  }
+
+  .game-header-top {
+    flex-wrap: wrap;
+    /* Allow wrapping */
+    justify-content: center !important;
+  }
+
+  /* Fix Input Area Button width on mobile */
+  .input-submit-btn {
+    min-width: unset !important;
+    /* Reset default min width if any */
+    padding: 12px 16px !important;
+    font-size: 0.9em !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* History Bubbles */
+  .history-bubble {
+    font-size: 0.95em;
+    max-width: 85% !important;
+    /* Slightly reduced from 95% to look more like chat */
+    min-width: unset !important;
+    /* Remove min-width to hug content */
+    box-sizing: border-box;
+    border-radius: 12px !important;
+    position: relative;
+    /* Simulate chat bubble triangle could go here if requested, keeping simple for now */
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.mobile-log-btn {
+  display: none;
+  /* Hidden on desktop */
+}
