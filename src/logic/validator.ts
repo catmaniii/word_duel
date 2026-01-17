@@ -86,7 +86,7 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
 }
 
 /**
- * Fetches 10 random 8+ letter words using DataMuse API.
+ * Fetches 10 random 6-12 letter words using DataMuse API.
  * Strategies for better results:
  * 1. Randomize starting letter to avoid "Always starting with A".
  * 2. Fetch from two different letters to mix it up.
@@ -103,10 +103,10 @@ export async function fetchNewPresets(): Promise<string[]> {
         while (char2 === char1) char2 = alphabet[Math.floor(Math.random() * alphabet.length)];
 
         // Helper to fetch words starting with a specific char
-        // sp=${char}???????* -> Starts with char, followed by at least 7 chars (total 8+), * allows more.
+        // sp=${char}?????* -> Starts with char, followed by at least 5 chars (total 6+), * allows more.
         const fetchForLetter = async (char: string) => {
             // max=50 to get a good pool with metadata
-            const response = await fetch(`https://api.datamuse.com/words?sp=${char}???????*&max=50&md=f`);
+            const response = await fetch(`https://api.datamuse.com/words?sp=${char}?????*&max=50&md=f`);
             if (!response.ok) return [];
             return await response.json();
         };
@@ -131,7 +131,7 @@ export async function fetchNewPresets(): Promise<string[]> {
                 return { word, freq };
             })
             .filter(item =>
-                item.word.length >= 8 &&
+                item.word.length >= 6 &&
                 item.word.length <= 12 &&
                 /^[A-Z]+$/.test(item.word) // valid letters only
             );

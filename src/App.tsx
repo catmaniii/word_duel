@@ -17,8 +17,8 @@ interface HistoryItem {
 
 const PRESETS = [
   "PROGRAMMING", "ARCHITECTURE", "JAVASCRIPT", "DEVELOPER",
-  "ANTIGRAVITY", "COMMUNICATION", "DICTIONARY", "REVOLUTION",
-  "UNDERSTANDING", "PERSPECTIVE", "INTELLIGENCE"
+  "ANTIGRAVITY", "DICTIONARY", "REVOLUTION",
+  "PERSPECTIVE", "INTELLIGENCE"
 ];
 
 function App() {
@@ -85,6 +85,11 @@ function App() {
     const trimmedWord = word.trim().toUpperCase();
     if (trimmedWord.length < 6) {
       setSetupError("Word must be at least 6 letters long!");
+      playSound('error');
+      return;
+    }
+    if (trimmedWord.length > 12) {
+      setSetupError("Word must be at most 12 letters long!");
       playSound('error');
       return;
     }
@@ -224,7 +229,7 @@ function App() {
                   setSetupInput(e.target.value);
                   setSetupError('');
                 }}
-                placeholder="Enter a 6+ letter word..."
+                placeholder="Enter a 6-12 letter word..."
                 disabled={isSetupLoading}
                 style={{
                   width: '100%',
