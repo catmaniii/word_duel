@@ -11,7 +11,7 @@
 
 ### 📜 Pro Rules
 - **No Repeats**: You can't use the same word twice.
-- **Strict Vocabulary**: Proper nouns (names/places) and abbreviations are not allowed.
+- **Strict Vocabulary**: Proper nouns (names/places) are not allowed.
 - **Magic Reveal**: Stuck on the source word? Click/Hold the source word to reveal its Chinese definition for inspiration!
 
 ## 🚀 Deployment

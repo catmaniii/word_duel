@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Dynamic Initial Presets**: Start screen now fetches random words instantly upon loading.
 - **Game Screen Branding**: Added a stylized "WORD DUEL" title to the game top bar.
 - **Magic Reveal**: Clicked/tapped the Source Word to toggle its Chinese definition with a smooth animation.
-- **Strict Word Validation**: Added detection and blocking of abbreviations and proper nouns (names/places) with specific error messages.
+- **Strict Word Validation**: Added detection and blocking of proper nouns (names/places) with specific error messages.
 - **Smart Input Focus**: 
   - PC: Input box auto-refocuses after submission for continuous typing.
   - PC: If a word is invalid, the input box automatically gains focus and selects the bad text for quick overwriting.

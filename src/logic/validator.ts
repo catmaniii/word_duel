@@ -3,7 +3,7 @@ import { COMMON_WORDS } from './commonWords';
 export interface WordResult {
     isValid: boolean;
     chinese: string;
-    errorType?: 'ABBREVIATION' | 'PROPER_NOUN' | 'INVALID';
+    errorType?: 'PROPER_NOUN' | 'INVALID';
 }
 
 /**
@@ -59,24 +59,15 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
             const data = await freeDictRes.json();
             const firstEntry = data[0];
 
-            // Heuristic for Abbreviations/Proper Nouns in Free Dictionary
-            let isAbbr = false;
+            // Heuristic for Proper Nouns in Free Dictionary
             let isProp = false;
 
             for (const meaning of firstEntry.meanings) {
                 const pos = meaning.partOfSpeech.toLowerCase();
                 if (pos.includes('proper noun')) isProp = true;
-
-                for (const defObj of meaning.definitions) {
-                    const def = defObj.definition.toLowerCase();
-                    if (def.includes('abbreviation') || def.includes('acronym') || def.includes('short for')) {
-                        isAbbr = true;
-                    }
-                }
             }
 
             if (isProp) return { isValid: false, chinese: '', errorType: 'PROPER_NOUN' };
-            if (isAbbr) return { isValid: false, chinese: '', errorType: 'ABBREVIATION' };
 
             // 2. Fetch Chinese definition from Youdao via Proxy
             let chineseDef = '';

@@ -123,9 +123,7 @@ function App() {
       // Validate if it's a real word
       const result = await checkWordDefinition(trimmedWord);
       if (!result.isValid) {
-        if (result.errorType === 'ABBREVIATION') {
-          setSetupError(`"${trimmedWord}" is an abbreviation and not allowed.`);
-        } else if (result.errorType === 'PROPER_NOUN') {
+        if (result.errorType === 'PROPER_NOUN') {
           setSetupError(`"${trimmedWord}" is a proper noun (name/place) and not allowed.`);
         } else {
           setSetupError(`"${trimmedWord}" is not a valid English word.`);
@@ -197,9 +195,7 @@ function App() {
       setCurrentPlayer(prev => prev === 1 ? 2 : 1);
     } else {
       // Invalid word
-      if (result.errorType === 'ABBREVIATION') {
-        setStatusMsg(`"${word}" is an abbreviation and not allowed!`);
-      } else if (result.errorType === 'PROPER_NOUN') {
+      if (result.errorType === 'PROPER_NOUN') {
         setStatusMsg(`"${word}" is a proper noun and not allowed!`);
       } else {
         setStatusMsg(`"${word}" is not a valid English word!`);
@@ -273,7 +269,7 @@ function App() {
               <ul style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: '1.4' }}>
                 <li>Pick or enter a <b>6-12 letter word</b> to start.</li>
                 <li>Take turns to build new words from its letters.</li>
-                <li>Avoid names, places, abbreviations or repeats!</li>
+                <li>Avoid names, places or repeats!</li>
               </ul>
             </div>
 
