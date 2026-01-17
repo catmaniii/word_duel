@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { canConstruct, checkWordDefinition, fetchNewPresets } from './logic/validator' // Import function
-import { playSound } from './logic/sound'
+import { canConstruct, checkWordDefinition, fetchNewPresets } from './logic/validator'
+import { playSound, initAudio } from './logic/sound'
 import { LetterPool } from './components/LetterPool'
 import { HistoryList } from './components/HistoryList'
 import { InputArea } from './components/InputArea'
 import { ScoreBoard } from './components/ScoreBoard'
 import { SidebarList } from './components/SidebarList'
+
+// ... imports ...
 
 interface HistoryItem {
   word: string;
@@ -20,6 +22,21 @@ const PRESETS = [
 ];
 
 function App() {
+  // Init Audio Context on first click
+  useEffect(() => {
+    const handleInteraction = () => {
+      initAudio();
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
+  }, []);
+
   // Game Setup State
   const [presets, setPresets] = useState<string[]>(PRESETS);
   const [isRefreshingPresets, setIsRefreshingPresets] = useState(false);
@@ -341,46 +358,77 @@ function App() {
           {/* MAIN COLUMN */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-            {/* STICKY HEADER: Scores, Word, Pool */}
-            <div className="glass-panel" style={{
-              marginBottom: '1rem',
-              padding: '1rem',
-              flexShrink: 0,
+            {/* 1. TOP BAR: Buttons */}
+            <div style={{
+              padding: '0.5rem 1rem',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem'
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
             }}>
-              <div className="game-header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: '8px', order: 1 }}>
-                  <button
-                    onClick={() => setIsGameStarted(false)}
-                    style={{ padding: '4px 8px', fontSize: '0.8em', background: 'transparent', border: '1px solid #ccc', color: '#666' }}>
-                    Quit
-                  </button>
-                  {/* Log Button for Mobile */}
-                  <button
-                    className="mobile-log-btn"
-                    onClick={() => setShowMobileLog(true)}
-                    style={{ padding: '4px 8px', fontSize: '0.8em', background: '#e0e0e0', border: '1px solid #ccc', color: '#333' }}>
-                    Log
-                  </button>
-                </div>
-
-                <div className="source-word-display" style={{
-                  fontSize: '2rem',
-                  fontWeight: '900',
-                  letterSpacing: '0.1rem',
-                  color: '#333',
-                  textAlign: 'center',
-                  order: 2 // On desktop: center
-                }}>
-                  {sourceWord}
-                </div>
-
-                <div style={{ width: '50px', order: 3 }}></div> {/* Spacer for center alignment */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setIsGameStarted(false)}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.85em',
+                    background: 'rgba(255,255,255,0.8)',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    color: '#666',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}>
+                  Quit
+                </button>
+                <button
+                  className="mobile-log-btn"
+                  onClick={() => setShowMobileLog(true)}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.85em',
+                    background: 'rgba(255,255,255,0.8)',
+                    border: '1px solid #ccc',
+                    borderRadius: '6px',
+                    color: '#333',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}>
+                  Log
+                </button>
               </div>
+            </div>
 
+            {/* 2. SCORES */}
+            <div style={{ flexShrink: 0, padding: '0 1rem' }}>
               <ScoreBoard score1={scores[1]} score2={scores[2]} currentPlayer={currentPlayer} />
+            </div>
+
+            {/* 3. DIALOG BOX (History) */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '0 1rem',
+              margin: '0.5rem 0'
+            }}>
+              <HistoryList history={history} />
+            </div>
+
+            {/* 4. SOURCE WORD */}
+            <div style={{ textAlign: 'center', padding: '0.25rem', flexShrink: 0 }}>
+              <div style={{
+                fontSize: '2rem',
+                fontWeight: '900',
+                letterSpacing: '0.2rem',
+                color: '#333',
+                textShadow: '0 2px 4px rgba(255,255,255,0.5)'
+              }}>
+                {sourceWord}
+              </div>
+            </div>
+
+            {/* 5. LETTER POOL */}
+            <div style={{ padding: '0 1rem', flexShrink: 0 }}>
               <LetterPool
                 sourceWord={sourceWord}
                 currentInput={inputValue}
@@ -390,22 +438,24 @@ function App() {
               />
             </div>
 
-            {/* SCROLLABLE CONTENT: History Bubbles */}
-            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', marginBottom: '1rem' }}>
-              <HistoryList history={history} />
-            </div>
-
-            {/* STICKY FOOTER: Input Area */}
-            <div className="glass-panel" style={{ padding: '1rem', flexShrink: 0 }}>
+            {/* 6. INPUT AREA (and status) */}
+            <div className="glass-panel" style={{
+              padding: '1rem',
+              flexShrink: 0,
+              margin: '0.5rem',
+              marginTop: 0,
+              background: 'rgba(255,255,255,0.6)'
+            }}>
               {statusMsg && (
                 <div style={{
                   color: '#d32f2f',
                   background: '#ffcdd2',
-                  padding: '8px 16px',
+                  padding: '8px',
                   borderRadius: '8px',
                   marginBottom: '0.5rem',
                   fontWeight: 'bold',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  fontSize: '0.9rem'
                 }}>
                   {statusMsg}
                 </div>

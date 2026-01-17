@@ -49,6 +49,40 @@ export const LetterPool: React.FC<LetterPoolProps> = ({ sourceWord, currentInput
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '1rem 0' }}>
+            {/* Control Buttons (Clear/Backspace) - Moved to Top */}
+            {currentInput.length > 0 && (
+                <div style={{
+                    display: 'flex',
+                    gap: '16px',
+                    justifyContent: 'center',
+                    marginBottom: '4px'
+                }}>
+                    {/* Clear Button */}
+                    <button
+                        onClick={() => {
+                            playSound('delete');
+                            onClear();
+                        }}
+                        style={{ ...buttonStyle, background: '#fee', color: '#e53935', minWidth: '60px', padding: '0.5rem 0.8rem', fontSize: '1rem' }}
+                        title="Clear Input"
+                    >
+                        <span style={{ fontSize: '0.8em', marginRight: '4px' }}>✕</span> Clear
+                    </button>
+
+                    {/* Backspace Button */}
+                    <button
+                        onClick={() => {
+                            playSound('delete');
+                            onBackspace();
+                        }}
+                        style={{ ...buttonStyle, background: '#fff3e0', color: '#fb8c00', minWidth: '60px', padding: '0.5rem 0.8rem', fontSize: '1rem' }}
+                        title="Backspace"
+                    >
+                        <span style={{ fontSize: '0.8em', marginRight: '4px' }}>⌫</span> Back
+                    </button>
+                </div>
+            )}
+
             <div style={{
                 display: 'flex',
                 flexWrap: 'wrap',
@@ -87,39 +121,6 @@ export const LetterPool: React.FC<LetterPoolProps> = ({ sourceWord, currentInput
                     </button>
                 ))}
             </div>
-
-            {currentInput.length > 0 && (
-                <div style={{
-                    display: 'flex',
-                    gap: '16px',
-                    justifyContent: 'center',
-                    marginTop: '4px'
-                }}>
-                    {/* Clear Button */}
-                    <button
-                        onClick={() => {
-                            playSound('delete');
-                            onClear();
-                        }}
-                        style={{ ...buttonStyle, background: '#fee', color: '#e53935', minWidth: '60px' }}
-                        title="Clear Input"
-                    >
-                        <span style={{ fontSize: '0.8em', marginRight: '4px' }}>✕</span> Clear
-                    </button>
-
-                    {/* Backspace Button */}
-                    <button
-                        onClick={() => {
-                            playSound('delete');
-                            onBackspace();
-                        }}
-                        style={{ ...buttonStyle, background: '#fff3e0', color: '#fb8c00', minWidth: '60px' }}
-                        title="Backspace"
-                    >
-                        <span style={{ fontSize: '0.8em', marginRight: '4px' }}>⌫</span> Back
-                    </button>
-                </div>
-            )}
         </div>
     );
 };

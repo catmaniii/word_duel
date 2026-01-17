@@ -27,9 +27,10 @@ const playTone = (freq: number, type: OscillatorType, duration: number, delay = 
     osc.type = type;
     osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
 
-    // Envelope for "cute" short sounds
+    // Optimized Envelope: Instant attack for clicks/UI
+    const attackTime = 0.005; // 5ms attack to avoid click artifacts but feel instant
     gain.gain.setValueAtTime(0, ctx.currentTime + delay);
-    gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + delay + 0.02);
+    gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + delay + attackTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
 
     osc.connect(gain);
@@ -37,6 +38,14 @@ const playTone = (freq: number, type: OscillatorType, duration: number, delay = 
 
     osc.start(ctx.currentTime + delay);
     osc.stop(ctx.currentTime + delay + duration + 0.1);
+};
+
+// Call this on first user interaction to warm up audio
+export const initAudio = () => {
+    const ctx = getContext();
+    if (ctx && ctx.state === 'suspended') {
+        ctx.resume();
+    }
 };
 
 export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'start' | 'refresh') => {
