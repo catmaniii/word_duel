@@ -210,7 +210,7 @@ function App() {
       height: '100vh',
       maxWidth: '1200px',
       margin: '0 auto',
-      padding: '0', // Full bleed for setup, padding added inside components
+      padding: 'env(safe-area-inset-top) 0 0 0', // Safe area for mobile status bar/notches
       display: 'flex',
       flexDirection: 'column',
       boxSizing: 'border-box'

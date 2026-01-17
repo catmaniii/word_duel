@@ -1,4 +1,26 @@
 import { COMMON_WORDS } from './commonWords';
+import { CapacitorHttp, Capacitor } from '@capacitor/core';
+
+/**
+ * A helper to make HTTP requests that works on both web and native.
+ * On native, it uses CapacitorHttp to bypass CORS.
+ */
+async function universalFetch(url: string) {
+    if (Capacitor.isNativePlatform()) {
+        try {
+            const response = await CapacitorHttp.get({ url });
+            return {
+                ok: response.status >= 200 && response.status < 300,
+                status: response.status,
+                json: async () => response.data
+            };
+        } catch (e) {
+            console.error('CapacitorHttp error:', e);
+            throw e;
+        }
+    }
+    return fetch(url);
+}
 
 export interface WordResult {
     isValid: boolean;
@@ -53,7 +75,7 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
 
     try {
         // 1. Validate existence with Free Dictionary API
-        const freeDictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`);
+        const freeDictRes = await universalFetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`);
 
         if (freeDictRes.ok) {
             const data = await freeDictRes.json();
@@ -69,10 +91,18 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
 
             if (isProp) return { isValid: false, chinese: '', errorType: 'PROPER_NOUN' };
 
-            // 2. Fetch Chinese definition from Youdao via Proxy
+            // 2. Fetch Chinese definition from Youdao
             let chineseDef = '';
             try {
-                const youdaoRes = await fetch(`/api/proxy/youdao/suggest?num=1&doctype=json&q=${cleanWord}`);
+                // Determine URL based on environment:
+                // Web: Uses Vercel proxy to avoid CORS
+                // Native: Uses direct URL via CapacitorHttp
+                const isNative = Capacitor.isNativePlatform();
+                const youdaoUrl = isNative
+                    ? `https://dict.youdao.com/suggest?num=1&doctype=json&q=${cleanWord}`
+                    : `/api/proxy/youdao/suggest?num=1&doctype=json&q=${cleanWord}`;
+
+                const youdaoRes = await universalFetch(youdaoUrl);
                 if (youdaoRes.ok) {
                     const data = await youdaoRes.json();
                     if (data.data && data.data.entries && data.data.entries.length > 0) {
@@ -89,7 +119,7 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
         // If 404 or other issues, check DataMuse for Proper Noun tag
         // (Free Dictionary often 404s for common names/cities)
         try {
-            const dataMuseRes = await fetch(`https://api.datamuse.com/words?sp=${cleanWord}&md=p&max=1`);
+            const dataMuseRes = await universalFetch(`https://api.datamuse.com/words?sp=${cleanWord}&md=p&max=1`);
             if (dataMuseRes.ok) {
                 const dmData = await dataMuseRes.json();
                 if (dmData.length > 0 && dmData[0].word.toLowerCase() === cleanWord.toLowerCase()) {
@@ -132,7 +162,7 @@ export async function fetchNewPresets(): Promise<string[]> {
         // sp=${char}?????* -> Starts with char, followed by at least 5 chars (total 6+), * allows more.
         const fetchForLetter = async (char: string) => {
             // max=50 to get a good pool with metadata
-            const response = await fetch(`https://api.datamuse.com/words?sp=${char}?????*&max=50&md=f`);
+            const response = await universalFetch(`https://api.datamuse.com/words?sp=${char}?????*&max=50&md=f`);
             if (!response.ok) return [];
             return await response.json();
         };

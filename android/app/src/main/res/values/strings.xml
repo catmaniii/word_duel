@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">WordDuel</string>
+    <string name="title_activity_main">WordDuel</string>
+    <string name="package_name">com.wordduel.app</string>
+    <string name="custom_url_scheme">com.wordduel.app</string>
+</resources>
