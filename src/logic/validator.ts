@@ -94,20 +94,28 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
             // 2. Fetch Chinese definition from Youdao
             let chineseDef = '';
             try {
-                // Determine URL based on environment:
-                // Web: Uses Vercel proxy to avoid CORS
-                // Native: Uses direct URL via CapacitorHttp
                 const isNative = Capacitor.isNativePlatform();
-                const youdaoUrl = isNative
-                    ? `https://dict.youdao.com/suggest?num=1&doctype=json&q=${cleanWord}`
-                    : `/api/proxy/youdao/suggest?num=1&doctype=json&q=${cleanWord}`;
+                const wordLower = cleanWord.toLowerCase();
 
-                const youdaoRes = await universalFetch(youdaoUrl);
-                if (youdaoRes.ok) {
-                    const data = await youdaoRes.json();
-                    if (data.data && data.data.entries && data.data.entries.length > 0) {
-                        chineseDef = data.data.entries[0].explain;
+                // Helper to get correct URL format
+                const getUrl = (q: string) => isNative
+                    ? `https://dict.youdao.com/suggest?num=1&doctype=json&q=${q}`
+                    : `/api/proxy/youdao/suggest?num=1&doctype=json&q=${q}`;
+
+                // Try lowercase first (favors standard dictionary words)
+                const resLower = await universalFetch(getUrl(wordLower));
+                let data = resLower.ok ? await resLower.json() : null;
+
+                // Fallback to original casing if no entries found
+                if (!data?.data?.entries || data.data.entries.length === 0) {
+                    const resOrig = await universalFetch(getUrl(cleanWord));
+                    if (resOrig.ok) {
+                        data = await resOrig.json();
                     }
+                }
+
+                if (data?.data?.entries && data.data.entries.length > 0) {
+                    chineseDef = data.data.entries[0].explain;
                 }
             } catch (e) {
                 console.error('Youdao API failed:', e);
