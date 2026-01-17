@@ -1,73 +1,27 @@
-# React + TypeScript + Vite
+# ⚔️ WORD DUEL
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**WORD DUEL** is a fast-paced, two-player word construction game. Battle against a friend (Player 1 Red vs Player 2 Blue) to see who can build the most words from a single source word!
 
-Currently, two official plugins are available:
+## 🕹️ How to Play
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1.  **Start the Game**: One player enters a 6-12 letter word, or picks one from the random presets.
+2.  **Construct Words**: Players take turns building new English words using *only* the letters available in the main source word.
+3.  **Score Points**: Each valid word earns you points based on its length (1 letter = 1 point).
+4.  **Win the Duel**: The player with the highest score at the end wins!
 
-## React Compiler
+### 📜 Pro Rules
+- **No Repeats**: You can't use the same word twice.
+- **Strict Vocabulary**: Proper nouns (names/places) and abbreviations are not allowed.
+- **Magic Reveal**: Stuck on the source word? Click/Hold the source word to reveal its Chinese definition for inspiration!
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Deployment
 
-## Expanding the ESLint configuration
+The project is built with React + Vite + TypeScript. You can deploy it to Vercel with one click:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Push to GitHub.
+2. Connect to Vercel.
+3. Done! (Includes built-in API proxy for dictionary services).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Developed with ❤️ by Antigravity.

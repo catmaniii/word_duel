@@ -239,7 +239,7 @@ function App() {
             boxShadow: '0 10px 40px rgba(0,0,0,0.1)'
           }}>
             {/* Logo / Title Area */}
-            <div style={{ marginBottom: '2rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
               <h1 style={{
                 margin: 0,
                 fontSize: '3.5rem',
@@ -256,6 +256,25 @@ function App() {
               <p style={{ color: '#888', marginTop: '0.5rem', fontWeight: 500 }}>
                 Red vs Blue • Word Construction
               </p>
+            </div>
+
+            {/* Quick Instructions */}
+            <div style={{
+              marginBottom: '1.5rem',
+              textAlign: 'left',
+              fontSize: '0.85rem',
+              color: '#666',
+              background: 'rgba(255,255,255,0.4)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px border var(--glass-border)'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#444' }}>How to play:</div>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: '1.4' }}>
+                <li>Pick or enter a <b>6-12 letter word</b> to start.</li>
+                <li>Take turns to build new words from its letters.</li>
+                <li>Avoid names, places, abbreviations or repeats!</li>
+              </ul>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
