@@ -74,8 +74,8 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
     }
 
     try {
-        // 1. Validate existence with Free Dictionary API
-        const freeDictRes = await universalFetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`);
+        // 1. Validate existence with Free Dictionary API - normalize to lowercase
+        const freeDictRes = await universalFetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord.toLowerCase()}`);
 
         if (freeDictRes.ok) {
             const data = await freeDictRes.json();
@@ -119,6 +119,16 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
                 }
             } catch (e) {
                 console.error('Youdao API failed:', e);
+            }
+
+            // 3. Name Exclusion Check: If translation identifies it as a person's name
+            // BUT allow if it also has other common meanings (v., adj., adv., prep., conj., pron.)
+            const nameKeywords = ["人名", "姓氏", "男子名", "女子名"];
+            const hasNameKeyword = nameKeywords.some(k => chineseDef.includes(k));
+            const hasOtherPOS = ["v.", "adj.", "adv.", "prep.", "conj.", "pron."].some(k => chineseDef.includes(k));
+
+            if (hasNameKeyword && !hasOtherPOS) {
+                return { isValid: false, chinese: chineseDef, errorType: 'PROPER_NOUN' };
             }
 
             return { isValid: true, chinese: chineseDef };
@@ -214,5 +224,86 @@ export async function fetchNewPresets(): Promise<string[]> {
     } catch (e) {
         console.error("Failed to fetch presets", e);
         return [];
+    }
+}
+
+/**
+ * Finds a valid English word that can be constructed from sourceWord but hasn't been used yet.
+ * Improved algorithm:
+ * 1. Exhaustive check in local COMMON_WORDS (High quality, 100% hits if in list).
+ * 2. Parallel API queries for ALL unique possible starting letters.
+ * 3. Pre-shuffles and validates to ensure high success rate.
+ */
+export async function findValidHint(sourceWord: string, usedWords: Set<string>): Promise<string | null> {
+    try {
+        const s = sourceWord.toUpperCase();
+        const uniqueChars = Array.from(new Set(s.split(''))).sort(() => 0.5 - Math.random());
+
+        // --- Step 1: Exhaustive Local Search (FAST & RELIABLE) ---
+        const localCandidates: { word: string, freq: number }[] = [];
+        for (const [word] of COMMON_WORDS.entries()) {
+            const uword = word.toUpperCase();
+            const isAllowedSingle = uword === 'A' || uword === 'I';
+            if ((uword.length >= 2 || isAllowedSingle) && uword.length <= 12 && uword !== s && !usedWords.has(uword) && canConstruct(uword, s)) {
+                localCandidates.push({ word: uword, freq: 5000 });
+            }
+        }
+
+        // If we found enough local common words, just use them (instant & high quality)
+        if (localCandidates.length >= 3) {
+            const shuffled = localCandidates.sort(() => 0.5 - Math.random());
+            // Still sort by frequency just in case we have many, but they all have 5000 here
+            return shuffled[0].word;
+        }
+
+        // --- Step 2: Comprehensive API Search (Fallback) ---
+        // Only if local common words are exhausted
+        const fetchForLetter = async (char: string) => {
+            const response = await universalFetch(`https://api.datamuse.com/words?sp=${char}*&max=200&md=f`);
+            if (!response.ok) return [];
+            return await response.json();
+        };
+
+        const results = await Promise.all(uniqueChars.map(c => fetchForLetter(c)));
+        const allApiResults = results.flat();
+
+        // Screen API results
+        const seen = new Set<string>();
+        const validApiCandidates: { word: string, freq: number }[] = [];
+
+        // Randomize API candidates to vary results
+        const randomApi = allApiResults.sort(() => 0.5 - Math.random());
+
+        for (const item of randomApi) {
+            const word = item.word.toUpperCase();
+            if (seen.has(word)) continue;
+            const isAllowedSingle = word === 'A' || word === 'I';
+            if ((word.length < 2 && !isAllowedSingle) || word.length > 12) continue;
+            if (word === s) continue;
+            if (usedWords.has(word)) continue;
+            if (COMMON_WORDS.has(word)) continue; // Already handled in Step 1
+            if (!/^[A-Z]+$/.test(word)) continue;
+
+            if (canConstruct(word, s)) {
+                const validation = await checkWordDefinition(word);
+                if (validation.isValid) {
+                    seen.add(word);
+                    const freq = parseFloat(item.tags?.find((t: string) => t.startsWith('f:'))?.split(':')[1] || '0');
+                    validApiCandidates.push({ word, freq });
+                    if (validApiCandidates.length >= 5) break;
+                }
+            }
+        }
+
+        // Combine findings
+        const finalPool = [...localCandidates, ...validApiCandidates];
+        if (finalPool.length === 0) return null;
+
+        finalPool.sort((a, b) => b.freq - a.freq);
+        return finalPool[0].word;
+
+    } catch (e) {
+        console.error("Failed to find hint", e);
+        return null;
     }
 }

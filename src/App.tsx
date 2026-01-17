@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { canConstruct, checkWordDefinition, fetchNewPresets } from './logic/validator'
+import { canConstruct, checkWordDefinition, fetchNewPresets, findValidHint } from './logic/validator'
 import { playSound, initAudio } from './logic/sound'
 import { LetterPool } from './components/LetterPool'
 import { HistoryList } from './components/HistoryList'
@@ -81,6 +81,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [showMobileLog, setShowMobileLog] = useState(false);
+
+  // Hint / Ad States
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [isAdPlaying, setIsAdPlaying] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(2);
+  const [isSearchingHint, setIsSearchingHint] = useState(false);
 
   // Auto-scroll history to bottom
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -211,6 +217,50 @@ function App() {
     }
   };
 
+  const handleRequestHint = async () => {
+    if (showAdModal || isAdPlaying) return;
+    setShowAdModal(true);
+  };
+
+  const startWatchingAd = () => {
+    setIsAdPlaying(true);
+    let count = 2;
+    setAdCountdown(count);
+
+    const interval = setInterval(() => {
+      count -= 1;
+      setAdCountdown(count);
+      if (count <= 0) {
+        clearInterval(interval);
+        finalizeHint();
+      }
+    }, 1000);
+  };
+
+  const finalizeHint = async () => {
+    setIsSearchingHint(true);
+    setIsLoading(true);
+    try {
+      const hint = await findValidHint(sourceWord, usedWords);
+      if (hint) {
+        setInputValue(hint);
+        setStatusMsg(`Hint: "${hint}" revealed!`);
+        playSound('success');
+      } else {
+        setStatusMsg("No simple hints found for this word!");
+        playSound('error');
+      }
+    } catch (e) {
+      console.error("Hint failed:", e);
+      setStatusMsg("Failed to get hint. Try again later.");
+    } finally {
+      setIsLoading(false);
+      setIsSearchingHint(false);
+      setIsAdPlaying(false);
+      setShowAdModal(false);
+    }
+  };
+
   return (
     <div style={{
       width: '100%',
@@ -245,14 +295,15 @@ function App() {
             <div style={{ marginBottom: '1.5rem' }}>
               <h1 style={{
                 margin: 0,
-                fontSize: '3.5rem',
+                fontSize: 'clamp(2rem, 12vw, 3.5rem)',
                 fontWeight: '900',
                 background: 'linear-gradient(90deg, var(--color-accent-player1) 0%, var(--color-accent-player2) 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 letterSpacing: '-2px',
                 lineHeight: '1.1',
-                userSelect: 'none'
+                userSelect: 'none',
+                whiteSpace: 'nowrap'
               }}>
                 WORD DUEL
               </h1>
@@ -598,25 +649,19 @@ function App() {
 
               {/* 6. INPUT AREA (and status) */}
               <div className="glass-panel" style={{
-                padding: '0.75rem',
+                padding: '0.5rem',
                 flexShrink: 0,
-                margin: '0.25rem',
+                margin: '0.2rem',
                 marginTop: 0,
                 background: 'rgba(255,255,255,0.6)'
               }}>
                 {statusMsg && (
                   <div style={{
                     color: '#d32f2f',
-                    background: '#ffcdd2',
-                    padding: '6px 8px',
-                    borderRadius: '8px',
-                    marginBottom: '0.4rem',
-                    fontWeight: 'bold',
                     textAlign: 'center',
-                    fontSize: '0.9rem',
-                    overflowX: 'auto',
-                    maxWidth: '100%',
-                    whiteSpace: 'nowrap'
+                    marginBottom: '4px',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold'
                   }}>
                     {statusMsg}
                   </div>
@@ -628,9 +673,76 @@ function App() {
                   onSubmit={handleSubmitGuess}
                   isLoading={isLoading}
                   currentPlayer={currentPlayer}
+                  onRequestHint={handleRequestHint}
                 />
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* AD MODAL OVERLAY */}
+      {showAdModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '2rem',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: '400px',
+            width: '100%',
+            padding: '2rem',
+            textAlign: 'center',
+            background: 'white'
+          }}>
+            {!isAdPlaying ? (
+              <>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💡</div>
+                <h2 style={{ marginBottom: '1rem' }}>Magic Hint</h2>
+                <p style={{ color: '#666', marginBottom: '2rem' }}>
+                  Watch a 5-second video to reveal a hidden word for this duel!
+                </p>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    onClick={() => setShowAdModal(false)}
+                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', background: 'none', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={startWatchingAd}
+                    style={{ flex: 1, padding: '12px', borderRadius: '8px', background: 'var(--color-accent-player1)', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>
+                    Watch Ad
+                  </button>
+                </div>
+              </>
+            ) : isSearchingHint ? (
+              <>
+                <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
+                <h3 style={{ marginBottom: '0.5rem' }}>Magical Oracle Thinking...</h3>
+                <p style={{ color: '#666', fontSize: '0.9rem' }}>
+                  Searching the ancient scrolls for a valid word...
+                </p>
+                <div style={{ marginTop: '1rem', fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--color-accent-player1)' }}>
+                  This might take a second for rare combinations
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
+                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing...</h3>
+                <p style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--color-accent-player1)' }}>
+                  Reward in {adCountdown}s
+                </p>
+                <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
+                  (This is a simulated ad for development)
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
