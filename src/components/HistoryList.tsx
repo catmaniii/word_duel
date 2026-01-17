@@ -14,15 +14,12 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history }) => {
     return (
         <div style={{
             display: 'flex',
-            flexDirection: 'column', // Newest at bottom visually if we want, or top. 
-            // Actually standard chat usually puts newest at bottom. Let's stick to list order.
-            // If we want newest first, use flex-col.
-            gap: '10px',
-            // Height controlled by parent
-            padding: '10px',
+            flexDirection: 'column',
+            gap: '6px', // Reduced from 10px
+            padding: '8px', // Reduced from 10px
             width: '100%',
-            boxSizing: 'border-box', // Prevent padding from adding to width
-            overflowX: 'hidden', // Force hide horizontal scroll
+            boxSizing: 'border-box',
+            overflowX: 'hidden',
         }}>
             {history.map((item, idx) => (
                 <div key={idx} className="history-bubble" style={{
@@ -30,18 +27,30 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history }) => {
                     backgroundColor: item.player === 1 ? 'var(--color-bg-player1)' : 'var(--color-bg-player2)',
                     color: '#333',
                     border: `1px solid ${item.player === 1 ? 'var(--color-accent-player1)' : 'var(--color-accent-player2)'}`,
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    maxWidth: '80%', // Desktop max width
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                    borderRadius: '10px',
+                    padding: '4px 10px',
+                    maxWidth: '85%',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                     textAlign: 'left',
-                    wordBreak: 'break-word', // Ensure words break
-                    overflowWrap: 'anywhere', // Better than break-word for exact fits
-                    hyphens: 'auto'
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere',
+                    lineHeight: '1.2'
                 }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{item.word}</div>
+                    <div style={{
+                        fontWeight: 'bold',
+                        fontSize: '1.1em',
+                        textAlign: item.player === 1 ? 'left' : 'right' // P2 word aligned right
+                    }}>
+                        {item.word}
+                    </div>
                     {item.chinese && (
-                        <div style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>
+                        <div style={{
+                            fontSize: '0.8em',
+                            color: '#666',
+                            marginTop: '1px',
+                            lineHeight: '1.2',
+                            textAlign: 'left' // Ensure definition stays left-aligned
+                        }}>
                             {item.chinese}
                         </div>
                     )}

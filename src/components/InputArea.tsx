@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { canConstruct } from '../logic/validator';
 
 interface InputAreaProps {
@@ -12,6 +12,10 @@ interface InputAreaProps {
 
 export const InputArea: React.FC<InputAreaProps> = ({ sourceWord, value, onChange, onSubmit, isLoading, currentPlayer }) => {
     const [isFormatValid, setIsFormatValid] = useState(true);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Simple mobile detection
+    const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     useEffect(() => {
         if (value) {
@@ -20,6 +24,24 @@ export const InputArea: React.FC<InputAreaProps> = ({ sourceWord, value, onChang
             setIsFormatValid(true);
         }
     }, [value, sourceWord]);
+
+    const prevLoading = useRef(isLoading);
+
+    // Handle focus on PC
+    useEffect(() => {
+        if (!isMobile()) {
+            // Success case: loading finished and value was cleared
+            if (!isLoading && value === '') {
+                inputRef.current?.focus();
+            }
+            // Failure/Error case: loading finished but value remains
+            if (prevLoading.current === true && !isLoading && value !== '') {
+                inputRef.current?.focus();
+                inputRef.current?.select();
+            }
+        }
+        prevLoading.current = isLoading;
+    }, [isLoading, value]);
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -35,12 +57,12 @@ export const InputArea: React.FC<InputAreaProps> = ({ sourceWord, value, onChang
     return (
         <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', gap: '8px' }}>
             <input
+                ref={inputRef}
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={`Player ${currentPlayer}'s turn...`}
                 disabled={isLoading}
-                autoFocus
                 style={{
                     flex: 1,
                     minWidth: 0, // Allow shrinking

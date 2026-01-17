@@ -1,6 +1,9 @@
+import { COMMON_WORDS } from './commonWords';
+
 export interface WordResult {
     isValid: boolean;
     chinese: string;
+    errorType?: 'ABBREVIATION' | 'PROPER_NOUN' | 'INVALID';
 }
 
 /**
@@ -33,55 +36,87 @@ export function canConstruct(target: string, source: string): boolean {
 
 /**
  * Validates the word using Free Dictionary API and fetches Chinese definition from Youdao.
- * Returns true for isValid if Free Dictionary returns 200.
+ * Uses a fallback list of common words for words not in the dictionary API.
+ * Returns true for isValid if Free Dictionary returns 200 or word is in common words list.
  * Chinese definition is fetched via proxy to avoid CORS.
  */
 export async function checkWordDefinition(word: string): Promise<WordResult> {
     const cleanWord = word.trim();
-    if (!cleanWord) return { isValid: false, chinese: '' };
+    if (!cleanWord) return { isValid: false, chinese: '', errorType: 'INVALID' };
+
+    // Check common words list first (prepositions, conjunctions, etc.)
+    const upperWord = cleanWord.toUpperCase();
+    if (COMMON_WORDS.has(upperWord)) {
+        const chinese = COMMON_WORDS.get(upperWord) || '';
+        return { isValid: true, chinese };
+    }
 
     try {
         // 1. Validate existence with Free Dictionary API
         const freeDictRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`);
 
-        if (freeDictRes.status === 404) {
-            return { isValid: false, chinese: '' };
+        if (freeDictRes.ok) {
+            const data = await freeDictRes.json();
+            const firstEntry = data[0];
+
+            // Heuristic for Abbreviations/Proper Nouns in Free Dictionary
+            let isAbbr = false;
+            let isProp = false;
+
+            for (const meaning of firstEntry.meanings) {
+                const pos = meaning.partOfSpeech.toLowerCase();
+                if (pos.includes('proper noun')) isProp = true;
+
+                for (const defObj of meaning.definitions) {
+                    const def = defObj.definition.toLowerCase();
+                    if (def.includes('abbreviation') || def.includes('acronym') || def.includes('short for')) {
+                        isAbbr = true;
+                    }
+                }
+            }
+
+            if (isProp) return { isValid: false, chinese: '', errorType: 'PROPER_NOUN' };
+            if (isAbbr) return { isValid: false, chinese: '', errorType: 'ABBREVIATION' };
+
+            // 2. Fetch Chinese definition from Youdao via Proxy
+            let chineseDef = '';
+            try {
+                const youdaoRes = await fetch(`/api/proxy/youdao/suggest?num=1&doctype=json&q=${cleanWord}`);
+                if (youdaoRes.ok) {
+                    const data = await youdaoRes.json();
+                    if (data.data && data.data.entries && data.data.entries.length > 0) {
+                        chineseDef = data.data.entries[0].explain;
+                    }
+                }
+            } catch (e) {
+                console.error('Youdao API failed:', e);
+            }
+
+            return { isValid: true, chinese: chineseDef };
         }
 
-        if (!freeDictRes.ok) {
-            // Fallback or error handling for other statuses
-            console.warn('Free Dictionary API Error:', freeDictRes.statusText);
-            // If API is down, we might want to fail safe or fail hard. 
-            // For this game, let's assume if it's not 404, it might be valid but we failed to check?
-            // Let's treat non-200/404 as invalid for safety or valid if we trust user?
-            // Requirement: "If found... valid. Otherwise invalid." -> So strictly check 200.
-            return { isValid: false, chinese: '' };
-        }
-
-        // 2. Fetch Chinese definition from Youdao via Proxy
-        // Youdao Suggest API: https://dict.youdao.com/suggest?num=1&doctype=json&q=WORD
-        // Proxied to: /api/proxy/youdao/suggest...
-        let chineseDef = '';
+        // If 404 or other issues, check DataMuse for Proper Noun tag
+        // (Free Dictionary often 404s for common names/cities)
         try {
-            const youdaoRes = await fetch(`/api/proxy/youdao/suggest?num=1&doctype=json&q=${cleanWord}`);
-            if (youdaoRes.ok) {
-                const data = await youdaoRes.json();
-                // data.data.entries[0].explain usually holds the definition
-                if (data.data && data.data.entries && data.data.entries.length > 0) {
-                    chineseDef = data.data.entries[0].explain;
+            const dataMuseRes = await fetch(`https://api.datamuse.com/words?sp=${cleanWord}&md=p&max=1`);
+            if (dataMuseRes.ok) {
+                const dmData = await dataMuseRes.json();
+                if (dmData.length > 0 && dmData[0].word.toLowerCase() === cleanWord.toLowerCase()) {
+                    const tags = dmData[0].tags || [];
+                    if (tags.includes('prop')) {
+                        return { isValid: false, chinese: '', errorType: 'PROPER_NOUN' };
+                    }
                 }
             }
         } catch (e) {
-            console.error('Youdao API failed:', e);
-            // Main validation passed, so checking failed only affects Chinese display.
-            // We still return true for isValid.
+            console.error('DataMuse check failed:', e);
         }
 
-        return { isValid: true, chinese: chineseDef };
+        return { isValid: false, chinese: '', errorType: 'INVALID' };
 
     } catch (error) {
         console.error('Validation error:', error);
-        return { isValid: false, chinese: '' };
+        return { isValid: false, chinese: '', errorType: 'INVALID' };
     }
 }
 

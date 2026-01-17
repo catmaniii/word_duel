@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { canConstruct, checkWordDefinition, fetchNewPresets } from './logic/validator'
 import { playSound, initAudio } from './logic/sound'
 import { LetterPool } from './components/LetterPool'
@@ -41,6 +41,18 @@ function App() {
   const [presets, setPresets] = useState<string[]>(PRESETS);
   const [isRefreshingPresets, setIsRefreshingPresets] = useState(false);
 
+  // Fetch initial random presets on mount
+  useEffect(() => {
+    const loadInitialPresets = async () => {
+      const newWords = await fetchNewPresets();
+      if (newWords.length > 0) {
+        setPresets(newWords);
+      }
+      // If fetch fails, keep the hardcoded PRESETS as fallback
+    };
+    loadInitialPresets();
+  }, []);
+
   const handleRefreshPresets = async () => {
     playSound('click');
     setIsRefreshingPresets(true);
@@ -53,6 +65,8 @@ function App() {
   };
 
   const [sourceWord, setSourceWord] = useState('');
+  const [sourceWordDef, setSourceWordDef] = useState('');
+  const [showSourceDef, setShowSourceDef] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [setupInput, setSetupInput] = useState('');
 
@@ -67,6 +81,14 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [showMobileLog, setShowMobileLog] = useState(false);
+
+  // Auto-scroll history to bottom
+  const historyEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (historyEndRef.current) {
+      historyEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [history]);
 
   // Styles for dynamic background
   const bgColor = isGameStarted
@@ -101,7 +123,13 @@ function App() {
       // Validate if it's a real word
       const result = await checkWordDefinition(trimmedWord);
       if (!result.isValid) {
-        setSetupError(`"${trimmedWord}" is not a valid English word.`);
+        if (result.errorType === 'ABBREVIATION') {
+          setSetupError(`"${trimmedWord}" is an abbreviation and not allowed.`);
+        } else if (result.errorType === 'PROPER_NOUN') {
+          setSetupError(`"${trimmedWord}" is a proper noun (name/place) and not allowed.`);
+        } else {
+          setSetupError(`"${trimmedWord}" is not a valid English word.`);
+        }
         setIsSetupLoading(false);
         playSound('error');
         return;
@@ -110,6 +138,8 @@ function App() {
       // Success - Start Game
       playSound('start');
       setSourceWord(trimmedWord);
+      setSourceWordDef(result.chinese || '');
+      setShowSourceDef(false);
       setIsGameStarted(true);
       setScores({ 1: 0, 2: 0 });
       setHistory([]);
@@ -167,7 +197,13 @@ function App() {
       setCurrentPlayer(prev => prev === 1 ? 2 : 1);
     } else {
       // Invalid word
-      setStatusMsg(`"${word}" is not a valid English word!`);
+      if (result.errorType === 'ABBREVIATION') {
+        setStatusMsg(`"${word}" is an abbreviation and not allowed!`);
+      } else if (result.errorType === 'PROPER_NOUN') {
+        setStatusMsg(`"${word}" is a proper noun and not allowed!`);
+      } else {
+        setStatusMsg(`"${word}" is not a valid English word!`);
+      }
       playSound('error');
     }
   };
@@ -212,7 +248,8 @@ function App() {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 letterSpacing: '-2px',
-                lineHeight: '1.1'
+                lineHeight: '1.1',
+                userSelect: 'none'
               }}>
                 WORD DUEL
               </h1>
@@ -246,7 +283,14 @@ function App() {
               />
 
               {setupError && (
-                <div style={{ color: '#e53935', fontSize: '0.9em', marginBottom: '10px' }}>
+                <div style={{
+                  color: '#e53935',
+                  fontSize: '0.9em',
+                  marginBottom: '10px',
+                  overflowX: 'auto',
+                  maxWidth: '100%',
+                  whiteSpace: 'nowrap'
+                }}>
                   {setupError}
                 </div>
               )}
@@ -314,21 +358,22 @@ function App() {
                 flexWrap: 'wrap',
                 gap: '8px',
                 justifyContent: 'center',
-                maxHeight: '150px',
+                height: '150px',
+                minHeight: '150px',
                 overflowY: 'auto'
               }}>
-                {isRefreshingPresets ? (
-                  <span style={{ color: '#ccc', fontSize: '0.9em' }}>Fetching new words...</span>
-                ) : presets.map(p => (
+                {presets.map(p => (
                   <button
                     key={p}
-                    disabled={isSetupLoading}
+                    disabled={isSetupLoading || isRefreshingPresets}
                     onClick={() => runStartGame(p)}
                     style={{
                       fontSize: '0.8em',
                       padding: '6px 12px',
                       background: '#f5f5f5',
-                      color: '#555'
+                      color: '#555',
+                      opacity: (isSetupLoading || isRefreshingPresets) ? 0.6 : 1,
+                      cursor: (isSetupLoading || isRefreshingPresets) ? 'not-allowed' : 'pointer'
                     }}>
                     {p}
                   </button>
@@ -339,8 +384,7 @@ function App() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flex: 1, gap: '1rem', overflow: 'hidden' }}>
-
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* MOBILE SIDEBAR OVERLAY */}
           {showMobileLog && (
             <div className="mobile-sidebar-overlay" onClick={() => setShowMobileLog(false)}>
@@ -355,126 +399,216 @@ function App() {
             </div>
           )}
 
-          {/* SIDEBAR: Compact List */}
-          <div className="desktop-sidebar">
-            <SidebarList history={history} />
+          {/* 1. TOP BAR: Global First Line */}
+          <div style={{
+            padding: '0.5rem 1rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+            width: '100%',
+            height: '50px', // Fixed height for consistency
+            boxSizing: 'border-box',
+            background: '#ffffff',
+            borderBottom: '1px solid rgba(0,0,0,0.1)',
+            position: 'relative',
+            zIndex: 10
+          }}>
+            {/* Left Side: Quit */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
+              <button
+                onClick={() => setIsGameStarted(false)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '0.85em',
+                  background: 'rgba(255,255,255,0.8)',
+                  border: '1px solid #ccc',
+                  borderRadius: '8px',
+                  color: '#666',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                }}>
+                Quit
+              </button>
+            </div>
+
+            {/* Center: Title */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+              <h2 style={{
+                margin: 0,
+                fontSize: '1.2rem',
+                fontWeight: '900',
+                background: 'linear-gradient(90deg, var(--color-accent-player1) 0%, var(--color-accent-player2) 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                letterSpacing: '-1px',
+                lineHeight: '1',
+                whiteSpace: 'nowrap',
+                userSelect: 'none'
+              }}>
+                WORD DUEL
+              </h2>
+            </div>
+
+            {/* Right Side: Log */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                className="mobile-log-btn"
+                onClick={() => setShowMobileLog(true)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '0.85em',
+                  background: 'rgba(255,255,255,0.8)',
+                  border: '1px solid #ccc',
+                  borderRadius: '8px',
+                  color: '#333',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                }}>
+                Log
+              </button>
+            </div>
           </div>
 
-          {/* MAIN COLUMN */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Main Layout Area: Sidebar + Main Content */}
+          <div style={{
+            display: 'flex',
+            flex: 1,
+            gap: '1.25rem',
+            overflow: 'hidden',
+            padding: '2rem 1rem 1rem 1rem' // Further increased top padding (2rem)
+          }}>
+            {/* SIDEBAR: Compact List */}
+            <div className="desktop-sidebar">
+              <SidebarList history={history} />
+            </div>
 
-            {/* 1. TOP BAR: Buttons */}
-            <div style={{
-              padding: '0.5rem 1rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexShrink: 0
-            }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setIsGameStarted(false)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '0.85em',
-                    background: 'rgba(255,255,255,0.8)',
-                    border: '1px solid #ccc',
-                    borderRadius: '6px',
-                    color: '#666',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}>
-                  Quit
-                </button>
-                <button
-                  className="mobile-log-btn"
-                  onClick={() => setShowMobileLog(true)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '0.85em',
-                    background: 'rgba(255,255,255,0.8)',
-                    border: '1px solid #ccc',
-                    borderRadius: '6px',
-                    color: '#333',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}>
-                  Log
-                </button>
+            {/* MAIN COLUMN */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* 2. SCORES */}
+              <div style={{ flexShrink: 0, padding: '0 1rem', marginBottom: '0.5rem' }}>
+                <ScoreBoard score1={scores[1]} score2={scores[2]} currentPlayer={currentPlayer} />
               </div>
-            </div>
 
-            {/* 2. SCORES */}
-            <div style={{ flexShrink: 0, padding: '0 1rem' }}>
-              <ScoreBoard score1={scores[1]} score2={scores[2]} currentPlayer={currentPlayer} />
-            </div>
-
-            {/* 3. DIALOG BOX (History) */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '0 1rem',
-              margin: '0.5rem 0'
-            }}>
-              <HistoryList history={history} />
-            </div>
-
-            {/* 4. SOURCE WORD */}
-            <div style={{ textAlign: 'center', padding: '0.25rem', flexShrink: 0 }}>
+              {/* 3. DIALOG BOX (History) */}
               <div style={{
-                fontSize: '2rem',
-                fontWeight: '900',
-                letterSpacing: '0.2rem',
-                color: '#333',
-                textShadow: '0 2px 4px rgba(255,255,255,0.5)'
+                flex: 1,
+                overflowY: 'auto',
+                padding: '0 1rem',
+                margin: '0.25rem 0'
               }}>
-                {sourceWord}
+                <HistoryList history={history} />
+                <div ref={historyEndRef} />
+              </div>
+
+              {/* 4. SOURCE WORD - Floating Definition Reveal */}
+              <div style={{ textAlign: 'center', padding: '0.1rem', flexShrink: 0, position: 'relative' }}>
+                <div
+                  onMouseEnter={() => setShowSourceDef(true)}
+                  onMouseLeave={() => setShowSourceDef(false)}
+                  onPointerDown={() => setShowSourceDef(true)}
+                  onPointerUp={() => setShowSourceDef(false)}
+                  onPointerCancel={() => setShowSourceDef(false)}
+                  style={{
+                    fontSize: 'clamp(1.8rem, 8vw, 2.6rem)',
+                    fontWeight: '950',
+                    letterSpacing: '0.3rem',
+                    color: '#1a1a1a',
+                    textShadow: '2px 2px 0px #fff, 4px 4px 0px rgba(0,0,0,0.1)',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-block',
+                    margin: '0 auto',
+                    cursor: 'help', // "Help" cursor indicates info on hover
+                    userSelect: 'none',
+                    transition: 'transform 0.2s'
+                  }}
+                >
+                  {sourceWord}
+                </div>
+
+                {/* Floating Tooltip-style Definition */}
+                {showSourceDef && sourceWordDef && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '110%', // Position above the word
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 100,
+                    width: 'max-content',
+                    maxWidth: '280px',
+                    fontSize: '0.85rem',
+                    color: '#fff',
+                    background: 'rgba(50,50,50,0.95)', // Darker theme for tooltip feel
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    animation: 'fadeInDown 0.2s ease-out',
+                    wordBreak: 'break-word',
+                    pointerEvents: 'none' // Don't block mouse
+                  }}>
+                    {sourceWordDef}
+                    {/* Tiny arrow */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      marginLeft: '-5px',
+                      borderWidth: '5px',
+                      borderStyle: 'solid',
+                      borderColor: 'rgba(50,50,50,0.95) transparent transparent transparent'
+                    }} />
+                  </div>
+                )}
+              </div>
+
+              {/* 5. LETTER POOL */}
+              <div style={{ padding: '0 0.5rem', flexShrink: 0 }}>
+                <LetterPool
+                  sourceWord={sourceWord}
+                  currentInput={inputValue}
+                  onLetterClick={(char) => setInputValue(prev => prev + char)}
+                  onBackspace={() => setInputValue(prev => prev.slice(0, -1))}
+                  onClear={() => setInputValue('')}
+                />
+              </div>
+
+              {/* 6. INPUT AREA (and status) */}
+              <div className="glass-panel" style={{
+                padding: '0.75rem',
+                flexShrink: 0,
+                margin: '0.25rem',
+                marginTop: 0,
+                background: 'rgba(255,255,255,0.6)'
+              }}>
+                {statusMsg && (
+                  <div style={{
+                    color: '#d32f2f',
+                    background: '#ffcdd2',
+                    padding: '6px 8px',
+                    borderRadius: '8px',
+                    marginBottom: '0.4rem',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    fontSize: '0.9rem',
+                    overflowX: 'auto',
+                    maxWidth: '100%',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {statusMsg}
+                  </div>
+                )}
+                <InputArea
+                  sourceWord={sourceWord}
+                  value={inputValue}
+                  onChange={setInputValue}
+                  onSubmit={handleSubmitGuess}
+                  isLoading={isLoading}
+                  currentPlayer={currentPlayer}
+                />
               </div>
             </div>
-
-            {/* 5. LETTER POOL */}
-            <div style={{ padding: '0 1rem', flexShrink: 0 }}>
-              <LetterPool
-                sourceWord={sourceWord}
-                currentInput={inputValue}
-                onLetterClick={(char) => setInputValue(prev => prev + char)}
-                onBackspace={() => setInputValue(prev => prev.slice(0, -1))}
-                onClear={() => setInputValue('')}
-              />
-            </div>
-
-            {/* 6. INPUT AREA (and status) */}
-            <div className="glass-panel" style={{
-              padding: '1rem',
-              flexShrink: 0,
-              margin: '0.5rem',
-              marginTop: 0,
-              background: 'rgba(255,255,255,0.6)'
-            }}>
-              {statusMsg && (
-                <div style={{
-                  color: '#d32f2f',
-                  background: '#ffcdd2',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  marginBottom: '0.5rem',
-                  fontWeight: 'bold',
-                  textAlign: 'center',
-                  fontSize: '0.9rem'
-                }}>
-                  {statusMsg}
-                </div>
-              )}
-              <InputArea
-                sourceWord={sourceWord}
-                value={inputValue}
-                onChange={setInputValue}
-                onSubmit={handleSubmitGuess}
-                isLoading={isLoading}
-                currentPlayer={currentPlayer}
-              />
-            </div>
-
           </div>
         </div>
       )}

@@ -48,14 +48,14 @@ export const LetterPool: React.FC<LetterPoolProps> = ({ sourceWord, currentInput
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '1rem 0' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '0.25rem 0' }}>
             {/* Control Buttons (Clear/Backspace) - Moved to Top */}
             {currentInput.length > 0 && (
                 <div style={{
                     display: 'flex',
-                    gap: '16px',
+                    gap: '8px',
                     justifyContent: 'center',
-                    marginBottom: '4px'
+                    marginBottom: '2px'
                 }}>
                     {/* Clear Button */}
                     <button
@@ -86,7 +86,7 @@ export const LetterPool: React.FC<LetterPoolProps> = ({ sourceWord, currentInput
             <div style={{
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: '8px',
+                gap: '4px',
                 justifyContent: 'center',
             }}>
                 {letters.map(({ char, count }) => (
