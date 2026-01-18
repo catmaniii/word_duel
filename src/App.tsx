@@ -93,7 +93,6 @@ function App() {
   // Hint / Ad States
   const [showAdModal, setShowAdModal] = useState(false);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
-  const [adCountdown, setAdCountdown] = useState(2);
   const [isHintBlinking, setIsHintBlinking] = useState(false);
   const [isSearchingHint, setIsSearchingHint] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
@@ -362,23 +361,8 @@ function App() {
         setShowAdModal(false);
       }
     } else {
-      // Logic for web environments (simulated rewarded experience via timer)
-      setIsAdPlaying(true);
-
-      // Use 15 seconds for production web, 2 seconds for local dev
-      const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      let count = isLocalHost ? 2 : 15;
-
-      setAdCountdown(count);
-
-      const interval = setInterval(() => {
-        count -= 1;
-        setAdCountdown(count);
-        if (count <= 0) {
-          clearInterval(interval);
-          finalizeHint();
-        }
-      }, 1000);
+      // Logic for web environments: Instant hint since we use display ads instead of rewarded videos
+      finalizeHint();
     }
   };
 
@@ -942,7 +926,7 @@ function App() {
                   />
                 )}
                 <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing... {!Capacitor.isNativePlatform() && `(${adCountdown}s)`}</h3>
+                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing...</h3>
                 <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
                   {!Capacitor.isNativePlatform() ? (
                     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? (
