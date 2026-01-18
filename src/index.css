@@ -224,6 +224,12 @@ button:focus-visible {
   border-color: transparent;
 }
 
+.player-bubble.eliminated {
+  filter: grayscale(1);
+  border-style: dashed;
+  opacity: 0.5;
+}
+
 @keyframes modalPop {
   0% {
     transform: scale(0.8);
@@ -236,6 +242,22 @@ button:focus-visible {
   }
 }
 
+@keyframes fadeInScale {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .shame-modal {
   animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.victory-modal {
+  animation: fadeInScale 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }

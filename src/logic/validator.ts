@@ -25,7 +25,7 @@ async function universalFetch(url: string) {
 export interface WordResult {
     isValid: boolean;
     chinese: string;
-    errorType?: 'PROPER_NOUN' | 'INVALID';
+    errorType?: 'PROPER_NOUN' | 'INVALID' | 'NETWORK_ERROR';
 }
 
 /**
@@ -155,7 +155,8 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
 
     } catch (error) {
         console.error('Validation error:', error);
-        return { isValid: false, chinese: '', errorType: 'INVALID' };
+        // If fetch throws, it's almost certainly a network issue
+        return { isValid: false, chinese: '', errorType: 'NETWORK_ERROR' };
     }
 }
 

@@ -31,7 +31,7 @@ export const SidebarList: React.FC<SidebarListProps> = ({ history }) => {
                     <div key={idx} style={{
                         fontSize: '0.8rem',
                         padding: '2px 4px',
-                        color: item.player === 1 ? '#d64545' : '#457ad6', // Darker shades of player colors
+                        color: `var(--p${item.player}-color)`,
                         borderBottom: '1px solid rgba(0,0,0,0.05)',
                         display: 'flex',
                         justifyContent: 'space-between'

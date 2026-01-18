@@ -41,7 +41,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history }) => {
                         <div style={{
                             fontWeight: 'bold',
                             fontSize: '1.1em',
-                            textAlign: isEven ? 'right' : 'left'
+                            textAlign: isEven ? 'right' : 'left',
+                            color: `var(--p${item.player}-color)`
                         }}>
                             {item.word}
                         </div>

@@ -48,7 +48,7 @@ export const initAudio = () => {
     }
 };
 
-export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'start' | 'refresh' | 'shame') => {
+export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'start' | 'refresh' | 'shame' | 'victory') => {
     try {
         switch (type) {
             case 'click':
@@ -87,6 +87,12 @@ export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'star
                 const audio = new Audio('/boo.mp3');
                 audio.volume = 0.3;
                 audio.play().catch(e => console.error('Boo sound failed', e));
+                break;
+            case 'victory':
+                // Play local "Victory" sound file
+                const victoryAudio = new Audio('/victory.mp3');
+                victoryAudio.volume = 0.4;
+                victoryAudio.play().catch(e => console.error('Victory sound failed', e));
                 break;
         }
     } catch (e) {

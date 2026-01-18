@@ -79,6 +79,9 @@ function App() {
   const [loser, setLoser] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
+  const [eliminatedPlayers, setEliminatedPlayers] = useState<Set<number>>(new Set());
+  const [winner, setWinner] = useState<number | null>(null);
+  const [showRoastModal, setShowRoastModal] = useState(false);
 
   // Input State
   const [inputValue, setInputValue] = useState('');
@@ -148,6 +151,8 @@ function App() {
       if (!result.isValid) {
         if (result.errorType === 'PROPER_NOUN') {
           setSetupError(`"${trimmedWord}" is a proper noun (name/place) and not allowed.`);
+        } else if (result.errorType === 'NETWORK_ERROR') {
+          setSetupError("网络不通畅，请检查网络连接！");
         } else {
           setSetupError(`"${trimmedWord}" is not a valid English word.`);
         }
@@ -223,6 +228,8 @@ function App() {
       // Invalid word
       if (result.errorType === 'PROPER_NOUN') {
         setStatusMsg(`"${word}" is a proper noun and not allowed!`);
+      } else if (result.errorType === 'NETWORK_ERROR') {
+        setStatusMsg("网络不通畅，请检查网络连接！");
       } else {
         setStatusMsg(`"${word}" is not a valid English word!`);
       }
@@ -274,7 +281,13 @@ function App() {
   ];
 
   const handleNextTurn = () => {
-    setCurrentPlayer(prev => (prev % playerCount) + 1);
+    let next = (currentPlayer % playerCount) + 1;
+    let attempts = 0;
+    while (eliminatedPlayers.has(next) && attempts < playerCount) {
+      next = (next % playerCount) + 1;
+      attempts++;
+    }
+    setCurrentPlayer(next);
   };
 
   const handleSurrender = () => {
@@ -285,8 +298,33 @@ function App() {
   const confirmSurrender = () => {
     playSound('shame');
     setLoser(currentPlayer);
-    setIsGameOver(true);
+    const newEliminated = new Set(eliminatedPlayers);
+    newEliminated.add(currentPlayer);
+    setEliminatedPlayers(newEliminated);
     setShowSurrenderConfirm(false);
+
+    // Check if only one player remains
+    const activeCount = playerCount - newEliminated.size;
+    if (activeCount === 1) {
+      // Find the winner
+      for (let i = 1; i <= playerCount; i++) {
+        if (!newEliminated.has(i)) {
+          setWinner(i);
+          break;
+        }
+      }
+    }
+    setShowRoastModal(true);
+  };
+
+  const closeRoastAndContinue = () => {
+    setShowRoastModal(false);
+    if (winner) {
+      setIsGameOver(true);
+      playSound('victory');
+    } else {
+      handleNextTurn();
+    }
   };
 
   const handleRestart = () => {
@@ -295,10 +333,14 @@ function App() {
     setCurrentPlayer(1);
     setHistory([]);
     setUsedWords(new Set());
+    setEliminatedPlayers(new Set());
+    setWinner(null);
+    setLoser(0);
     setInputValue('');
     setStatusMsg('');
     setShowSourceDef(false);
     setSourceWord('');
+    setShowRoastModal(false);
   };
 
   const handleRequestHint = async () => {
@@ -696,9 +738,9 @@ function App() {
 
             {/* MAIN COLUMN */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              {/* 2. SCORES */}
+              {/* 2. PLAYER INDICATORS */}
               <div style={{ flexShrink: 0, padding: '0 1rem', marginBottom: '0.5rem' }}>
-                <PlayerStatus playerCount={playerCount} currentPlayer={currentPlayer} />
+                <PlayerStatus playerCount={playerCount} currentPlayer={currentPlayer} eliminatedPlayers={eliminatedPlayers} />
               </div>
 
               {/* 3. DIALOG BOX (History) */}
@@ -1065,7 +1107,7 @@ function App() {
           </div>
         </div>
       )}
-      {isGameOver && (
+      {showRoastModal && (
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -1074,8 +1116,8 @@ function App() {
           justifyContent: 'center',
           alignItems: 'center',
           padding: '20px',
-          background: 'rgba(255,255,255,0.2)', // Light and transparent
-          backdropFilter: 'blur(12px)' // Stronger blur
+          background: 'rgba(255,255,255,0.2)',
+          backdropFilter: 'blur(12px)'
         }}>
           <div className="shame-modal glass-panel" style={{
             maxWidth: '400px',
@@ -1085,8 +1127,8 @@ function App() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            background: 'white', // Fixed white background
-            border: `6px solid var(--p${loser}-color)`, // Thicker dynamic border
+            background: 'white',
+            border: `6px solid var(--p${loser}-color)`,
             borderRadius: '24px',
             animation: 'none'
           }}>
@@ -1104,7 +1146,7 @@ function App() {
               fontSize: '1.35rem',
               fontWeight: '800',
               fontStyle: 'italic',
-              marginBottom: '1rem', // Reduced spacing to fit image
+              marginBottom: '1rem',
               color: '#444',
               lineHeight: '1.4',
               maxWidth: '320px',
@@ -1119,13 +1161,13 @@ function App() {
               filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.25))'
             }} />
             <button
-              onClick={handleRestart}
+              onClick={closeRoastAndContinue}
               style={{
                 width: '100%',
                 padding: '18px',
                 fontSize: '1.3rem',
                 fontWeight: '900',
-                background: 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)',
+                background: winner ? 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)' : `var(--p${loser}-color)`,
                 color: 'white',
                 border: 'none',
                 borderRadius: '16px',
@@ -1133,7 +1175,74 @@ function App() {
                 boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
                 transition: 'transform 0.2s'
               }}>
-              RESTART GAME
+              {winner ? 'SEE WHO WON' : 'CONTINUE BATTLE'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isGameOver && winner && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 2500,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px',
+          background: 'rgba(255,255,255,0.4)',
+          backdropFilter: 'blur(15px)'
+        }}>
+          <div className="victory-modal glass-panel" style={{
+            maxWidth: '450px',
+            width: '95%',
+            textAlign: 'center',
+            padding: '3rem 2rem',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            background: 'white',
+            border: `8px solid var(--p${winner}-color)`,
+            borderRadius: '32px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            animation: 'fadeInScale 0.5s ease-out'
+          }}>
+            <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>🏆</div>
+            <h1 style={{
+              fontSize: '3rem',
+              fontWeight: '950',
+              margin: '0 0 0.5rem 0',
+              color: '#333',
+              lineHeight: '1'
+            }}>
+              VICTORY!
+            </h1>
+            <h2 style={{
+              fontSize: '2rem',
+              fontWeight: '900',
+              marginBottom: '2rem',
+              color: `var(--p${winner}-color)`
+            }}>
+              PLAYER {winner} IS THE GOAT
+            </h2>
+            <p style={{ color: '#666', marginBottom: '2.5rem', fontSize: '1.2rem' }}>
+              The last word-smith standing. <br />Everyone else was just noise.
+            </p>
+            <button
+              onClick={handleRestart}
+              style={{
+                width: '100%',
+                padding: '20px',
+                fontSize: '1.5rem',
+                fontWeight: '900',
+                background: 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+              }}>
+              NEW GAME ⚔️
             </button>
           </div>
         </div>
