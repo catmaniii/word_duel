@@ -8,6 +8,7 @@ import { PlayerStatus } from './components/PlayerStatus'
 import { SidebarList } from './components/SidebarList'
 import { WebAdBanner } from './components/WebAdBanner'
 
+import { AdSenseUnit } from './components/AdSenseUnit'
 import { AdService } from './logic/adService'
 import { Capacitor } from '@capacitor/core'
 
@@ -627,6 +628,12 @@ function App() {
               </div>
             </div>
 
+            {/* AdSense Unit on Setup Screen */}
+            {!Capacitor.isNativePlatform() && (
+              <div style={{ marginTop: '1.5rem', minHeight: '100px' }}>
+                <AdSenseUnit slot="9240397827" format="horizontal" />
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -734,6 +741,11 @@ function App() {
             {/* SIDEBAR: Compact List */}
             <div className="desktop-sidebar">
               <SidebarList history={history} />
+              {!Capacitor.isNativePlatform() && (
+                <div style={{ marginTop: '1rem', minHeight: '250px' }}>
+                  <AdSenseUnit slot="9240397827" format="vertical" />
+                </div>
+              )}
             </div>
 
             {/* MAIN COLUMN */}
@@ -1228,6 +1240,11 @@ function App() {
             <p style={{ color: '#666', marginBottom: '2.5rem', fontSize: '1.2rem' }}>
               The last word-smith standing. <br />Everyone else was just noise.
             </p>
+            {!Capacitor.isNativePlatform() && (
+              <div style={{ width: '100%', marginBottom: '2rem', minHeight: '100px' }}>
+                <AdSenseUnit slot="9240397827" format="rectangle" />
+              </div>
+            )}
             <button
               onClick={handleRestart}
               style={{
