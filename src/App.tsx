@@ -98,6 +98,7 @@ function App() {
   const [isSearchingHint, setIsSearchingHint] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [adErrorMessage, setAdErrorMessage] = useState('');
 
   // Auto-scroll history to bottom
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -135,6 +136,7 @@ function App() {
     } else if (adLoadStatus === 'unfilled' || adLoadStatus === 'error') {
       // FAIL! Trigger 5s fallback.
       setIsUsingFallbackAd(true);
+      setAdErrorMessage(`AdSense: ${adLoadStatus}`);
       startFallbackTimer();
     } else {
       // STILL LOADING... wait up to 3.5s for AdSense to report
@@ -142,6 +144,7 @@ function App() {
         if (adLoadStatus === 'loading') {
           console.log("AdSense timeout, using fallback");
           setIsUsingFallbackAd(true);
+          setAdErrorMessage("AdSense: loading timeout (3.5s)");
           startFallbackTimer();
         }
       }, 3500);
@@ -389,6 +392,7 @@ function App() {
   const handleRequestHint = async () => {
     if (showAdModal || isAdPlaying) return;
     setAdLoadStatus('loading');
+    setAdErrorMessage('');
     setIsUsingFallbackAd(false);
     setAdCountdown(5);
     setShowAdModal(true);
@@ -398,13 +402,14 @@ function App() {
     if (Capacitor.isNativePlatform()) {
       setIsAdPlaying(true);
       const result = await AdService.showRewardedAd();
-      if (result === true) {
+      if (result.success) {
         finalizeHint();
       } else {
-        // result could be false or potentially an error object if we refactored
-        setStatusMsg("Ad failed. Check your internet or AdMob settings.");
-        setIsAdPlaying(false);
-        setShowAdModal(false);
+        // FAIL! Trigger 5s fallback just like web.
+        console.log("AdMob failed, using fallback", result.error);
+        setAdErrorMessage(`AdMob: ${result.error || 'Unknown Error'}`);
+        setIsUsingFallbackAd(true);
+        startFallbackTimer();
       }
     } else {
       // Logic for web environments: Just let the useEffect handle it via adLoadStatus
@@ -979,7 +984,14 @@ function App() {
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
                   {isUsingFallbackAd ? (
-                    <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Web AdSense Failed - Using 5s Simulated Wait</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Ad Failed - Using 5s Simulated Wait</span>
+                      {adErrorMessage && (
+                        <span style={{ fontSize: '0.7rem', color: '#ff4444', fontStyle: 'italic', wordBreak: 'break-all' }}>
+                          Err: {adErrorMessage}
+                        </span>
+                      )}
+                    </div>
                   ) : !Capacitor.isNativePlatform() ? (
                     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? (
                       <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Development Mode (Wait for AdSense or 3.5s Fallback)</span>

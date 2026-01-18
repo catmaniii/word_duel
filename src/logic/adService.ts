@@ -55,16 +55,24 @@ export class AdService {
     /**
      * Shows a rewarded ad and returns a promise that resolves when the user earns a reward
      */
-    static async showRewardedAd(): Promise<boolean> {
+    static async showRewardedAd(): Promise<{ success: boolean; error?: string }> {
         if (!Capacitor.isNativePlatform()) {
             console.warn('AdMob skipped: Not on native platform');
-            return true; // Simulate success for web dev
+            return { success: true }; // Simulate success for web dev
         }
 
         // If not loaded yet (or previous failed), try to load it now
         if (!this.isAdLoaded) {
             console.log('AdMob: Ad not ready, loading on demand...');
-            await this.loadAd();
+            try {
+                await this.loadAd();
+            } catch (e: any) {
+                return { success: false, error: e?.message || "Failed to load pre-ad" };
+            }
+        }
+
+        if (!this.isAdLoaded) {
+            return { success: false, error: "Ad rejected or failed to load. Check AdMob console." };
         }
 
         return new Promise(async (resolve) => {
@@ -82,7 +90,7 @@ export class AdService {
                 // Start loading the next ad for next time
                 this.isAdLoaded = false;
                 this.loadAd();
-                resolve(rewarded);
+                resolve({ success: rewarded });
             };
 
             const onFailed = (error: any) => {
@@ -91,7 +99,7 @@ export class AdService {
                 this.isAdLoaded = false;
                 // Try to load again for next time
                 this.loadAd();
-                resolve(false);
+                resolve({ success: false, error: error?.message || "Ad failed to show (FailedToShow)" });
             };
 
             const cleanup = () => {
@@ -106,12 +114,12 @@ export class AdService {
 
                 // Show the already prepared ad
                 await AdMob.showRewardVideoAd();
-            } catch (e) {
+            } catch (e: any) {
                 console.error('Error playing rewarded ad:', e);
                 cleanup();
                 this.isAdLoaded = false;
                 this.loadAd();
-                resolve(false);
+                resolve({ success: false, error: e?.message || "Exception while showing ad" });
             }
         });
     }
