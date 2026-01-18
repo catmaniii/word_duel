@@ -22,6 +22,26 @@ The project is built with React + Vite + TypeScript. You can deploy it to Vercel
 2. Connect to Vercel.
 3. Done! (Includes built-in API proxy for dictionary services).
 
+## 💰 Monetization & Ads
+
+Word Duel uses **Google AdMob** (Android) and **Google AdSense** (Web) for monetization.
+
+### 📱 Android (AdMob)
+- **App-ads.txt**: Hosted at `https://word-duel-five.vercel.app/app-ads.txt`
+- **Toggling Ads**: Modify the following constant in `src/logic/adService.ts`:
+
+```typescript
+// src/logic/adService.ts
+const USE_TEST_ADS = true; // Set to 'false' for Production
+```
+
+- **Test Mode (`true`)**: Uses Google's official test IDs. Safe for development.
+- **Production Mode (`false`)**: Uses the real Ad Unit ID configured in the file.
+
+### 🌐 Web (AdSense)
+- **Auto-Switching**: The web version automatically uses a **2s countdown** on `localhost` for fast testing and a **15s countdown** on production domains to ensure ad visibility.
+- **Ad Placement**: Banners appear inside the Hint Modal for a non-intrusive experience.
+
 ---
 
 Developed with ❤️ by Antigravity.

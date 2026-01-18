@@ -48,7 +48,7 @@ export const initAudio = () => {
     }
 };
 
-export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'start' | 'refresh') => {
+export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'start' | 'refresh' | 'shame') => {
     try {
         switch (type) {
             case 'click':
@@ -81,6 +81,12 @@ export const playSound = (type: 'click' | 'success' | 'error' | 'delete' | 'star
                 // Quick swoosh
                 playTone(600, 'sine', 0.1, 0, 0.05);
                 playTone(1000, 'sine', 0.2, 0.05, 0.05);
+                break;
+            case 'shame':
+                // Play local "Boo" sound file
+                const audio = new Audio('/boo.mp3');
+                audio.volume = 0.3;
+                audio.play().catch(e => console.error('Boo sound failed', e));
                 break;
         }
     } catch (e) {

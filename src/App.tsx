@@ -4,10 +4,12 @@ import { playSound, initAudio } from './logic/sound'
 import { LetterPool } from './components/LetterPool'
 import { HistoryList } from './components/HistoryList'
 import { InputArea } from './components/InputArea'
-import { ScoreBoard } from './components/ScoreBoard'
+import { PlayerStatus } from './components/PlayerStatus'
 import { SidebarList } from './components/SidebarList'
+import { WebAdBanner } from './components/WebAdBanner'
 
-// ... imports ...
+import { AdService } from './logic/adService'
+import { Capacitor } from '@capacitor/core'
 
 interface HistoryItem {
   word: string;
@@ -71,8 +73,10 @@ function App() {
   const [setupInput, setSetupInput] = useState('');
 
   // Game Loop State
-  const [currentPlayer, setCurrentPlayer] = useState<1 | 2>(1);
-  const [scores, setScores] = useState<{ 1: number, 2: number }>({ 1: 0, 2: 0 });
+  const [playerCount, setPlayerCount] = useState(2);
+  const [currentPlayer, setCurrentPlayer] = useState(1);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [loser, setLoser] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
 
@@ -86,7 +90,10 @@ function App() {
   const [showAdModal, setShowAdModal] = useState(false);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
   const [adCountdown, setAdCountdown] = useState(2);
+  const [isHintBlinking, setIsHintBlinking] = useState(false);
   const [isSearchingHint, setIsSearchingHint] = useState(false);
+  const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
 
   // Auto-scroll history to bottom
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -97,13 +104,23 @@ function App() {
   }, [history]);
 
   // Styles for dynamic background
-  const bgColor = isGameStarted
-    ? (currentPlayer === 1 ? 'var(--color-bg-player1)' : 'var(--color-bg-player2)')
-    : '#f0f0f0';
-
   useEffect(() => {
-    document.body.style.backgroundColor = bgColor;
-  }, [bgColor]);
+    if (isGameStarted && !isGameOver) {
+      document.documentElement.style.setProperty('--player-accent', `var(--p${currentPlayer}-color)`);
+      document.documentElement.style.setProperty('--player-bg', `var(--p${currentPlayer}-bg)`);
+    } else if (isGameOver) {
+      document.documentElement.style.setProperty('--player-accent', '#ff4444');
+      document.documentElement.style.setProperty('--player-bg', '#000000');
+    } else {
+      document.documentElement.style.setProperty('--player-accent', '#646cff');
+      document.documentElement.style.setProperty('--player-bg', '#f0f0f0');
+    }
+  }, [isGameStarted, isGameOver, currentPlayer]);
+
+  // Initialize AdMob on mount
+  useEffect(() => {
+    AdService.initialize();
+  }, []);
 
   const [setupError, setSetupError] = useState('');
   const [isSetupLoading, setIsSetupLoading] = useState(false);
@@ -145,13 +162,14 @@ function App() {
       setSourceWordDef(result.chinese || '');
       setShowSourceDef(false);
       setIsGameStarted(true);
-      setScores({ 1: 0, 2: 0 });
       setHistory([]);
       setUsedWords(new Set());
       setCurrentPlayer(1);
       setInputValue('');
       setStatusMsg('');
       setShowMobileLog(false);
+      setIsGameOver(false);
+      setLoser(0);
     } catch (e) {
       setSetupError("Failed to validate word. Please try again.");
       playSound('error');
@@ -197,15 +215,10 @@ function App() {
     if (result.isValid) {
       // Success!
       playSound('success');
-      const points = word.length;
-      setScores(prev => ({
-        ...prev,
-        [currentPlayer]: prev[currentPlayer] + points
-      }));
       setHistory(prev => [...prev, { word, player: currentPlayer, chinese: result.chinese }]);
       setUsedWords(prev => new Set(prev).add(word));
       setInputValue('');
-      setCurrentPlayer(prev => prev === 1 ? 2 : 1);
+      handleNextTurn();
     } else {
       // Invalid word
       if (result.errorType === 'PROPER_NOUN') {
@@ -217,24 +230,113 @@ function App() {
     }
   };
 
+  const ROASTS = [
+    "You couldn't find a word in a bowl of alphabet soup.",
+    "A dictionary would be a great birthday gift for you.",
+    "Is 'FAILURE' the only word in your internal dictionary?",
+    "I've seen better vocabulary in a toddler's first book.",
+    "Even autocorrect is embarrassed for you right now.",
+    "Your vocabulary is like 1% battery – struggling to stay alive.",
+    "Are you building words or just throwing random letters at the wall?",
+    "You're the human version of a tragic typo.",
+    "A spelling bee would be your ultimate nightmare.",
+    "I've seen grocery lists with more linguistic depth.",
+    "If words were money, you'd be deeply in debt.",
+    "Did you lose your vocabulary in the laundry?",
+    "Your brain is a 404 error: 'Word Not Found'.",
+    "Somewhere, a Scrabble board is laughing at you.",
+    "Is your neural network currently experiencing a spelling timeout?",
+    "You're the reason they put 'Read carefully' on shampoo bottles.",
+    "Watching you play is like watching someone try to spell 'CAT' with numbers.",
+    "You would literally lose a word-off to a parrot.",
+    "Is your vocabulary limited to 'Surrender' and 'Help'?",
+    "Your brain cells are in a group chat, and 'Intelligence' just left.",
+    "I've seen more depth in a shallow puddle than in your lexicon.",
+    "Maybe stick to picture books for a while?",
+    "Your mind is a vast desert of missing syllables.",
+    "Did you skip English class, or just the parts with actual words?",
+    "You struggle with 3-letter words, don't you? It's okay to admit it.",
+    "Your 'Word Power' is currently in the negatives.",
+    "Even a goldfish has a more extensive vocabulary than this.",
+    "You couldn't find a synonym if your life depended on it.",
+    "Is your head just a fancy case for a brain that's stuck on 'Loading'?",
+    "If you were a book, you'd be a coloring book.",
+    "You're the human equivalent of a blank page.",
+    "Your word construction skills are like a house of cards... flat.",
+    "Did your brain's 'Logic & Spelling' subscription expire?",
+    "You're like a dictionary with only the blank pages left.",
+    "If ignorance is bliss, you must be the happiest player alive.",
+    "I thought you were a Duelist, but you're more like a 'Dullest'.",
+    "Even the white flag is judging your lack of vocabulary.",
+    "Go back to preschool and start with the vowels.",
+    "Your brain is currently in 'Airplane Mode'. Reconnect and try again.",
+    "I've seen smarter word choices from a bowl of cereal.",
+  ];
+
+  const handleNextTurn = () => {
+    setCurrentPlayer(prev => (prev % playerCount) + 1);
+  };
+
+  const handleSurrender = () => {
+    playSound('click');
+    setShowSurrenderConfirm(true);
+  };
+
+  const confirmSurrender = () => {
+    playSound('shame');
+    setLoser(currentPlayer);
+    setIsGameOver(true);
+    setShowSurrenderConfirm(false);
+  };
+
+  const handleRestart = () => {
+    setIsGameStarted(false);
+    setIsGameOver(false);
+    setCurrentPlayer(1);
+    setHistory([]);
+    setUsedWords(new Set());
+    setInputValue('');
+    setStatusMsg('');
+    setShowSourceDef(false);
+    setSourceWord('');
+  };
+
   const handleRequestHint = async () => {
     if (showAdModal || isAdPlaying) return;
     setShowAdModal(true);
   };
 
-  const startWatchingAd = () => {
-    setIsAdPlaying(true);
-    let count = 2;
-    setAdCountdown(count);
-
-    const interval = setInterval(() => {
-      count -= 1;
-      setAdCountdown(count);
-      if (count <= 0) {
-        clearInterval(interval);
+  const startWatchingAd = async () => {
+    if (Capacitor.isNativePlatform()) {
+      setIsAdPlaying(true);
+      const result = await AdService.showRewardedAd();
+      if (result === true) {
         finalizeHint();
+      } else {
+        // result could be false or potentially an error object if we refactored
+        setStatusMsg("Ad failed. Check your internet or AdMob settings.");
+        setIsAdPlaying(false);
+        setShowAdModal(false);
       }
-    }, 1000);
+    } else {
+      // Logic for web environments (simulated rewarded experience via timer)
+      setIsAdPlaying(true);
+
+      // Use 15 seconds for production web, 2 seconds for local dev
+      const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      let count = isLocalHost ? 2 : 15;
+
+      setAdCountdown(count);
+
+      const interval = setInterval(() => {
+        count -= 1;
+        setAdCountdown(count);
+        if (count <= 0) {
+          clearInterval(interval);
+          finalizeHint();
+        }
+      }, 1000);
+    }
   };
 
   const finalizeHint = async () => {
@@ -246,6 +348,10 @@ function App() {
         setInputValue(hint);
         setStatusMsg(`Hint: "${hint}" revealed!`);
         playSound('success');
+
+        // Trigger blinking effect
+        setIsHintBlinking(true);
+        setTimeout(() => setIsHintBlinking(false), 1500); // Stop after 1.5s
       } else {
         setStatusMsg("No simple hints found for this word!");
         playSound('error');
@@ -297,9 +403,10 @@ function App() {
                 margin: 0,
                 fontSize: 'clamp(2rem, 12vw, 3.5rem)',
                 fontWeight: '900',
-                background: 'linear-gradient(90deg, var(--color-accent-player1) 0%, var(--color-accent-player2) 100%)',
+                background: 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
+                display: 'inline-block', // Ensure gradient applies correctly
                 letterSpacing: '-2px',
                 lineHeight: '1.1',
                 userSelect: 'none',
@@ -327,8 +434,32 @@ function App() {
               <ul style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: '1.4' }}>
                 <li>Pick or enter a <b>6-12 letter word</b> to start.</li>
                 <li>Take turns to build new words from its letters.</li>
-                <li>Avoid names, places or repeats!</li>
+                <li>Last player standing wins! Give up and you're out.</li>
               </ul>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '8px' }}>Number of Players:</div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => { playSound('click'); setPlayerCount(n); }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '2px solid',
+                      borderColor: playerCount === n ? 'var(--p1-color)' : '#eee',
+                      background: playerCount === n ? 'var(--p1-bg)' : 'white',
+                      color: playerCount === n ? 'var(--p1-color)' : '#999',
+                      fontWeight: 'bold',
+                      flex: 1,
+                      minWidth: '40px'
+                    }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div style={{ marginBottom: '2rem' }}>
@@ -375,7 +506,7 @@ function App() {
                   width: '100%',
                   padding: '16px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(90deg, var(--color-accent-player1) 0%, var(--color-accent-player2) 100%)',
+                  background: 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)',
                   color: 'white',
                   fontSize: '1.1rem',
                   fontWeight: 'bold',
@@ -390,8 +521,8 @@ function App() {
               </button>
             </div>
 
-            <div style={{ borderTop: '1px solid #eee', paddingTop: '1.5rem', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem', gap: '8px' }}>
+            <div style={{ borderTop: '1px solid #eee', paddingTop: '0.5rem', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '0.2rem', gap: '8px' }}>
                 <p style={{ color: '#999', fontSize: '0.9em', margin: 0 }}>
                   Or choose a random preset:
                 </p>
@@ -490,7 +621,10 @@ function App() {
             {/* Left Side: Quit */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-start' }}>
               <button
-                onClick={() => setIsGameStarted(false)}
+                onClick={() => {
+                  playSound('click');
+                  setShowQuitConfirm(true);
+                }}
                 style={{
                   padding: '6px 14px',
                   fontSize: '0.85em',
@@ -512,13 +646,15 @@ function App() {
                 margin: 0,
                 fontSize: '1.2rem',
                 fontWeight: '900',
-                background: 'linear-gradient(90deg, var(--color-accent-player1) 0%, var(--color-accent-player2) 100%)',
+                background: 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
+                display: 'inline-block', // Ensure gradient applies correctly
                 letterSpacing: '-1px',
                 lineHeight: '1',
                 whiteSpace: 'nowrap',
-                userSelect: 'none'
+                userSelect: 'none',
+                filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))'
               }}>
                 WORD DUEL
               </h2>
@@ -562,7 +698,7 @@ function App() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* 2. SCORES */}
               <div style={{ flexShrink: 0, padding: '0 1rem', marginBottom: '0.5rem' }}>
-                <ScoreBoard score1={scores[1]} score2={scores[2]} currentPlayer={currentPlayer} />
+                <PlayerStatus playerCount={playerCount} currentPlayer={currentPlayer} />
               </div>
 
               {/* 3. DIALOG BOX (History) */}
@@ -672,8 +808,9 @@ function App() {
                   onChange={setInputValue}
                   onSubmit={handleSubmitGuess}
                   isLoading={isLoading}
-                  currentPlayer={currentPlayer}
                   onRequestHint={handleRequestHint}
+                  onSurrender={handleSurrender}
+                  isHintBlinking={isHintBlinking}
                 />
               </div>
             </div>
@@ -698,14 +835,16 @@ function App() {
             width: '100%',
             padding: '2rem',
             textAlign: 'center',
-            background: 'white'
+            background: 'white',
+            border: '6px solid var(--player-accent)',
+            borderRadius: '24px'
           }}>
             {!isAdPlaying ? (
               <>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💡</div>
                 <h2 style={{ marginBottom: '1rem' }}>Magic Hint</h2>
                 <p style={{ color: '#666', marginBottom: '2rem' }}>
-                  Watch a 5-second video to reveal a hidden word for this duel!
+                  Watch an Ad video to reveal a valid word for this duel!
                 </p>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button
@@ -715,7 +854,16 @@ function App() {
                   </button>
                   <button
                     onClick={startWatchingAd}
-                    style={{ flex: 1, padding: '12px', borderRadius: '8px', background: 'var(--color-accent-player1)', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'var(--player-accent)',
+                      color: 'white',
+                      border: 'none',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}>
                     Watch Ad
                   </button>
                 </div>
@@ -733,16 +881,260 @@ function App() {
               </>
             ) : (
               <>
+                {!Capacitor.isNativePlatform() && (
+                  <WebAdBanner
+                    style={{ marginBottom: '1.5rem', minHeight: '100px', background: '#f9f9f9' }}
+                    adSlot="YOUR_HINT_MODAL_AD_SLOT"
+                  />
+                )}
                 <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing...</h3>
-                <p style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--color-accent-player1)' }}>
-                  Reward in {adCountdown}s
-                </p>
+                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing... {!Capacitor.isNativePlatform() && `(${adCountdown}s)`}</h3>
                 <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
-                  (This is a simulated ad for development)
+                  {!Capacitor.isNativePlatform() ? (
+                    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? (
+                      <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Development Mode (2s Fast-Track)</span>
+                    ) : (
+                      "(Ad loading from Google AdSense)"
+                    )
+                  ) : (
+                    "(This is a simulated ad for development)"
+                  )}
                 </p>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {showSurrenderConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 1500,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '2rem',
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: '350px',
+            width: '100%',
+            padding: '2rem',
+            textAlign: 'center',
+            background: 'white',
+            border: '6px solid var(--player-accent)',
+            borderRadius: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '1rem' }}>
+              <span style={{ fontSize: '3rem' }}>🏳️</span>
+              <img src="/Troll-Face-warning.png" alt="Warning!" style={{ height: '70px', width: 'auto' }} />
+            </div>
+            <h2 style={{ marginBottom: '1rem', color: '#333' }}>Give Up?</h2>
+            <p style={{ color: '#666', marginBottom: '2rem', lineHeight: '1.4' }}>
+              Are you sure? If you surrender now, <b style={{ color: 'var(--player-accent)' }}>you will be roasted mercilessly!</b>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <button
+                onClick={confirmSurrender}
+                style={{
+                  padding: '14px',
+                  borderRadius: '12px',
+                  background: '#ff4444',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: '900',
+                  cursor: 'pointer'
+                }}>
+                Go ahead. I don't care.
+              </button>
+              <button
+                onClick={() => setShowSurrenderConfirm(false)}
+                style={{
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #ddd',
+                  background: 'white',
+                  color: '#666',
+                  cursor: 'pointer'
+                }}>
+                No, wait! I can do this!
+              </button>
+
+              <div style={{
+                margin: '8px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                color: '#999',
+                fontSize: '0.85rem'
+              }}>
+                <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+                OR
+                <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowSurrenderConfirm(false);
+                  setShowAdModal(true);
+                  startWatchingAd();
+                }}
+                style={{
+                  padding: '14px',
+                  borderRadius: '12px',
+                  background: 'var(--player-accent)',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
+                }}>
+                <span>💡</span>
+                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
+                  <span>Give me a Hint</span>
+                  <span style={{ fontSize: '0.8em', opacity: 0.9 }}> (Watch Ad)</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* QUIT CONFIRMATION MODAL */}
+      {showQuitConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 1600,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '2rem',
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: '350px',
+            width: '100%',
+            padding: '2rem',
+            textAlign: 'center',
+            background: 'white',
+            border: '6px solid var(--player-accent)',
+            borderRadius: '24px'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚪</div>
+            <h2 style={{ marginBottom: '1rem', color: '#333' }}>Quit Game?</h2>
+            <p style={{ color: '#666', marginBottom: '2rem', lineHeight: '1.4' }}>
+              Are you sure you want to end this duel and return to the main menu? Your progress will be lost.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <button
+                onClick={() => {
+                  setShowQuitConfirm(false);
+                  handleRestart();
+                }}
+                style={{
+                  padding: '14px',
+                  borderRadius: '12px',
+                  background: '#ff4444',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: '900',
+                  cursor: 'pointer'
+                }}>
+                QUIT DUEL
+              </button>
+              <button
+                onClick={() => setShowQuitConfirm(false)}
+                style={{
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #ddd',
+                  background: 'white',
+                  color: '#666',
+                  cursor: 'pointer'
+                }}>
+                Keep Playing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isGameOver && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 2000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px',
+          background: 'rgba(255,255,255,0.2)', // Light and transparent
+          backdropFilter: 'blur(12px)' // Stronger blur
+        }}>
+          <div className="shame-modal glass-panel" style={{
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            padding: '2.5rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            background: 'white', // Fixed white background
+            border: `6px solid var(--p${loser}-color)`, // Thicker dynamic border
+            borderRadius: '24px',
+            animation: 'none'
+          }}>
+            <h1 style={{
+              fontSize: '2.4rem',
+              fontWeight: '950',
+              margin: '0 0 1.5rem 0',
+              color: `var(--p${loser}-color)`,
+              lineHeight: '1.1'
+            }}>
+              PLAYER {loser}<br />
+              SUCKS AT WORDS!
+            </h1>
+            <p style={{
+              fontSize: '1.35rem',
+              fontWeight: '800',
+              fontStyle: 'italic',
+              marginBottom: '1rem', // Reduced spacing to fit image
+              color: '#444',
+              lineHeight: '1.4',
+              maxWidth: '320px',
+              padding: '0 10px'
+            }}>
+              "{ROASTS[Math.floor(Date.now() / 1000) % ROASTS.length]}"
+            </p>
+            <img src="/Troll-Face-laugh.png" alt="Troll Laugh" style={{
+              height: '130px',
+              width: 'auto',
+              marginBottom: '2rem',
+              filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.25))'
+            }} />
+            <button
+              onClick={handleRestart}
+              style={{
+                width: '100%',
+                padding: '18px',
+                fontSize: '1.3rem',
+                fontWeight: '900',
+                background: 'linear-gradient(90deg, var(--p1-color) 0%, var(--p2-color) 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                transition: 'transform 0.2s'
+              }}>
+              RESTART GAME
+            </button>
           </div>
         </div>
       )}

@@ -7,12 +7,13 @@ interface InputAreaProps {
     onChange: (val: string) => void;
     onSubmit: () => void;
     isLoading: boolean;
-    currentPlayer: number;
     onRequestHint: () => void;
+    onSurrender: () => void;
+    isHintBlinking?: boolean;
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({
-    sourceWord, value, onChange, onSubmit, isLoading, currentPlayer, onRequestHint
+    sourceWord, value, onChange, onSubmit, isLoading, onRequestHint, onSurrender, isHintBlinking
 }) => {
     const [isFormatValid, setIsFormatValid] = useState(true);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +55,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
     };
 
     const borderColor = isFormatValid
-        ? (currentPlayer === 1 ? 'var(--color-accent-player1)' : 'var(--color-accent-player2)')
+        ? 'var(--player-accent)'
         : '#d32f2f'; // Darker red border
 
     // --- Rich Input Logic ---
@@ -88,27 +89,51 @@ export const InputArea: React.FC<InputAreaProps> = ({
     };
 
     return (
-        <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', gap: '5px', alignItems: 'center' }}>
-            <button
-                type="button"
-                onClick={onRequestHint}
-                title="Watch an ad for a hint"
-                style={{
-                    padding: '8px 12px',
-                    fontSize: '1.2rem',
-                    background: 'white',
-                    border: `1px solid #ddd`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '46px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                }}
-            >
-                💡
-            </button>
+        <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                    type="button"
+                    onClick={onRequestHint}
+                    title="Watch an ad for a hint"
+                    style={{
+                        padding: '8px',
+                        fontSize: '1.2rem',
+                        background: 'white',
+                        border: `1px solid #ddd`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '46px',
+                        width: '46px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                >
+                    💡
+                </button>
+                <button
+                    type="button"
+                    onClick={onSurrender}
+                    title="I give up!"
+                    style={{
+                        padding: '8px',
+                        fontSize: '1.2rem',
+                        background: 'white',
+                        border: `1px solid #ddd`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '46px',
+                        width: '46px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                >
+                    🏳️
+                </button>
+            </div>
 
             <div style={{ position: 'relative', flex: 1, height: '46px' }}>
                 {/* Visual Display Layer (Behind the transparent input) */}
@@ -133,6 +158,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 <input
                     ref={inputRef}
                     type="text"
+                    className={isHintBlinking ? 'hint-blink' : ''}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={value ? '' : `Guess a word...`}
@@ -162,14 +188,15 @@ export const InputArea: React.FC<InputAreaProps> = ({
                 className="input-submit-btn"
                 disabled={isLoading || !value || !isFormatValid}
                 style={{
-                    backgroundColor: currentPlayer === 1 ? 'var(--color-accent-player1)' : 'var(--color-accent-player2)',
+                    backgroundColor: 'var(--player-accent)',
                     color: 'white',
                     fontWeight: 'bold',
                     opacity: isLoading ? 0.7 : (isFormatValid && value ? 1 : 0.5),
                     height: '46px',
                     border: 'none',
                     borderRadius: '8px',
-                    cursor: (isLoading || !value || !isFormatValid) ? 'default' : 'pointer'
+                    cursor: (isLoading || !value || !isFormatValid) ? 'default' : 'pointer',
+                    minWidth: '60px'
                 }}
             >
                 {isLoading ? '...' : 'Go'}
