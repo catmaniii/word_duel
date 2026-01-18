@@ -92,6 +92,8 @@ function App() {
   const [showAdModal, setShowAdModal] = useState(false);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
   const [adCountdown, setAdCountdown] = useState(5);
+  const [adLoadStatus, setAdLoadStatus] = useState<'loading' | 'filled' | 'unfilled' | 'error'>('loading');
+  const [isUsingFallbackAd, setIsUsingFallbackAd] = useState(false);
   const [isHintBlinking, setIsHintBlinking] = useState(false);
   const [isSearchingHint, setIsSearchingHint] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
@@ -118,6 +120,48 @@ function App() {
       document.documentElement.style.setProperty('--player-bg', '#f0f0f0');
     }
   }, [isGameStarted, isGameOver, currentPlayer]);
+
+  // Handle Web AdSense Success/Fail Logic
+  useEffect(() => {
+    if (!isAdPlaying || Capacitor.isNativePlatform() || isUsingFallbackAd) return;
+
+    let fallbackTimeout: any;
+
+    if (adLoadStatus === 'filled') {
+      // SUCCESS! Give the user a moment to see the ad, then grant the hint.
+      setTimeout(() => {
+        if (isAdPlaying) finalizeHint();
+      }, 2000);
+    } else if (adLoadStatus === 'unfilled' || adLoadStatus === 'error') {
+      // FAIL! Trigger 5s fallback.
+      setIsUsingFallbackAd(true);
+      startFallbackTimer();
+    } else {
+      // STILL LOADING... wait up to 3.5s for AdSense to report
+      fallbackTimeout = setTimeout(() => {
+        if (adLoadStatus === 'loading') {
+          console.log("AdSense timeout, using fallback");
+          setIsUsingFallbackAd(true);
+          startFallbackTimer();
+        }
+      }, 3500);
+    }
+
+    return () => clearTimeout(fallbackTimeout);
+  }, [isAdPlaying, adLoadStatus, isUsingFallbackAd]);
+
+  const startFallbackTimer = () => {
+    let count = 5;
+    setAdCountdown(count);
+    const interval = setInterval(() => {
+      count -= 1;
+      setAdCountdown(count);
+      if (count <= 0) {
+        clearInterval(interval);
+        finalizeHint();
+      }
+    }, 1000);
+  };
 
   // Initialize AdMob on mount
   useEffect(() => {
@@ -344,6 +388,9 @@ function App() {
 
   const handleRequestHint = async () => {
     if (showAdModal || isAdPlaying) return;
+    setAdLoadStatus('loading');
+    setIsUsingFallbackAd(false);
+    setAdCountdown(5);
     setShowAdModal(true);
   };
 
@@ -360,19 +407,8 @@ function App() {
         setShowAdModal(false);
       }
     } else {
-      // Logic for web environments: Show AdSense ad for 5 seconds
+      // Logic for web environments: Just let the useEffect handle it via adLoadStatus
       setIsAdPlaying(true);
-      let count = 5;
-      setAdCountdown(count);
-
-      const interval = setInterval(() => {
-        count -= 1;
-        setAdCountdown(count);
-        if (count <= 0) {
-          clearInterval(interval);
-          finalizeHint();
-        }
-      }, 1000);
     }
   };
 
@@ -931,17 +967,22 @@ function App() {
               <>
                 {!Capacitor.isNativePlatform() && (
                   <AdSenseUnit
-                    style={{ marginBottom: '1.5rem', minHeight: '100px', background: '#f9f9f9' }}
+                    style={{ marginBottom: '1.5rem', minHeight: '100px', background: '#f9f9f9', display: isUsingFallbackAd ? 'none' : 'block' }}
                     slot="9240397827"
                     format="rectangle"
+                    onStatusChange={(status) => setAdLoadStatus(status)}
                   />
                 )}
                 <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing... ({adCountdown}s)</h3>
+                <h3 style={{ marginBottom: '0.5rem' }}>
+                  {isUsingFallbackAd ? `Simulated Ad... (${adCountdown}s)` : 'Ad Playing...'}
+                </h3>
                 <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
-                  {!Capacitor.isNativePlatform() ? (
+                  {isUsingFallbackAd ? (
+                    <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Web AdSense Failed - Using 5s Simulated Wait</span>
+                  ) : !Capacitor.isNativePlatform() ? (
                     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? (
-                      <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Development Mode (2s Fast-Track)</span>
+                      <span style={{ color: '#ff9800', fontWeight: 'bold' }}>⚠️ Development Mode (Wait for AdSense or 3.5s Fallback)</span>
                     ) : (
                       "(Ad loading from Google AdSense)"
                     )
