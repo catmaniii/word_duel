@@ -6,8 +6,6 @@ import { HistoryList } from './components/HistoryList'
 import { InputArea } from './components/InputArea'
 import { PlayerStatus } from './components/PlayerStatus'
 import { SidebarList } from './components/SidebarList'
-import { WebAdBanner } from './components/WebAdBanner'
-
 import { AdSenseUnit } from './components/AdSenseUnit'
 import { AdService } from './logic/adService'
 import { Capacitor } from '@capacitor/core'
@@ -93,6 +91,7 @@ function App() {
   // Hint / Ad States
   const [showAdModal, setShowAdModal] = useState(false);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(5);
   const [isHintBlinking, setIsHintBlinking] = useState(false);
   const [isSearchingHint, setIsSearchingHint] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
@@ -361,8 +360,19 @@ function App() {
         setShowAdModal(false);
       }
     } else {
-      // Logic for web environments: Instant hint since we use display ads instead of rewarded videos
-      finalizeHint();
+      // Logic for web environments: Show AdSense ad for 5 seconds
+      setIsAdPlaying(true);
+      let count = 5;
+      setAdCountdown(count);
+
+      const interval = setInterval(() => {
+        count -= 1;
+        setAdCountdown(count);
+        if (count <= 0) {
+          clearInterval(interval);
+          finalizeHint();
+        }
+      }, 1000);
     }
   };
 
@@ -920,13 +930,14 @@ function App() {
             ) : (
               <>
                 {!Capacitor.isNativePlatform() && (
-                  <WebAdBanner
+                  <AdSenseUnit
                     style={{ marginBottom: '1.5rem', minHeight: '100px', background: '#f9f9f9' }}
-                    adSlot="YOUR_HINT_MODAL_AD_SLOT"
+                    slot="9240397827"
+                    format="rectangle"
                   />
                 )}
                 <div className="spinner" style={{ margin: '0 auto 1.5rem auto' }}></div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing...</h3>
+                <h3 style={{ marginBottom: '0.5rem' }}>Ad Playing... ({adCountdown}s)</h3>
                 <p style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
                   {!Capacitor.isNativePlatform() ? (
                     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? (
