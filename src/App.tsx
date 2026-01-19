@@ -694,7 +694,6 @@ function App() {
           flexDirection: 'column',
           overflow: 'hidden',
           width: '100%',
-          height: '100%',
           background: 'var(--player-bg)',
           minHeight: 0
         }}>
@@ -797,12 +796,11 @@ function App() {
             overflow: 'hidden',
             padding: '1rem',
             width: '100%',
-            height: '100%',
             boxSizing: 'border-box',
             minHeight: 0
           }}>
             {/* SIDEBAR: Compact List */}
-            <div className="desktop-sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div className="desktop-sidebar" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <SidebarList history={history} />
               {!Capacitor.isNativePlatform() && (
                 <div style={{ marginTop: '1.5rem', minHeight: '250px', flexShrink: 0 }}>
@@ -812,28 +810,36 @@ function App() {
             </div>
 
             {/* MAIN COLUMN: Handles internal history scrolling and pinned bottom controls */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
               {/* 2. PLAYER INDICATORS */}
               <div style={{ flexShrink: 0, padding: '0 1rem', marginBottom: '0.5rem' }}>
                 <PlayerStatus playerCount={playerCount} currentPlayer={currentPlayer} eliminatedPlayers={eliminatedPlayers} />
               </div>
 
               {/* 3. DIALOG BOX (History) - Fills remaining space and scrolls */}
+              {/* 3. DIALOG BOX (History) - Fills remaining space and scrolls */}
               <div
                 ref={historyContainerRef}
                 style={{
                   flex: 1,
                   overflowY: 'auto',
+                  overflowX: 'hidden',
                   padding: '0 1rem',
-                  display: 'flex',
-                  flexDirection: 'column',
+                  minHeight: 0,
                   WebkitOverflowScrolling: 'touch'
                 }}>
-                <div style={{ flex: '1 0 0px' }} /> {/* Spacer allows shrinking to 0, but pushes content down */}
-                <div style={{ flexShrink: 0 }}>
-                  <HistoryList history={history} />
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: '100%',
+                  justifyContent: 'flex-end'
+                }}>
+                  <div style={{ flex: '1 0 0px' }} /> {/* Pushes content to bottom */}
+                  <div style={{ flexShrink: 0 }}>
+                    <HistoryList history={history} />
+                  </div>
+                  <div ref={historyEndRef} style={{ height: '1px', flexShrink: 0 }} />
                 </div>
-                <div ref={historyEndRef} style={{ height: '1px', flexShrink: 0 }} />
               </div>
 
               <div style={{

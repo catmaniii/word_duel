@@ -1,5 +1,6 @@
 import { COMMON_WORDS } from './commonWords';
 import { CapacitorHttp, Capacitor } from '@capacitor/core';
+import { isProfane } from './profanity';
 
 /**
  * A helper to make HTTP requests that works on both web and native.
@@ -56,6 +57,23 @@ export function canConstruct(target: string, source: string): boolean {
     return true;
 }
 
+// Core English 2-letter words and common lexicalized abbreviations.
+const CORE_2_LETTER_WORDS = new Set([
+    "TO", "IN", "IS", "IT", "AS", "AT", "BE", "BY", "DO", "HE", "IF", "ME", "MY", "NO", "OF", "ON", "OR", "SO", "UP", "US", "WE", "GO", "AM", "AN", "OX", "OH", "HI", "OK",
+    "AI", "TV", "ID", "PC", "VR", "AR", "PR", "IQ", "EQ", "DJ", "HR"
+]);
+
+// Whitelist for common abbreviations that are accepted as "words" in general usage.
+const ABBREVIATION_WHITELIST = new Set([
+    "AI", "TV", "ID", "PC", "VR", "AR", "PR", "IQ", "EQ", "DJ", "HR",
+    "USA", "FBI", "CIA", "BBC", "CNN", "KGB", "NSA", "DVD", "PDF", "SIM", "USB", "WWW", "RAM", "CPU", "GPU",
+    "APP", "URL", "ATM", "GPS", "VPN", "VIP", "GYM", "LAB", "DNA", "UFO", "PIN", "SOS",
+    "BBQ", "DIY", "FAQ", "BTW", "LOL", "OMG", "RIP", "CEO", "CTO", "CFO", "COO"
+]);
+
+// Keywords in Chinese translations that indicate an entry should be blocked for users under 13.
+const ABBR_KEYWORDS = ["缩写", "abbr.", "简称", "代码", "符号", "大写", "常用作", "公司", "机构", "组织"];
+
 /**
  * Validates the word using Free Dictionary API and fetches Chinese definition from Youdao.
  * Uses a fallback list of common words for words not in the dictionary API.
@@ -66,10 +84,34 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
     const cleanWord = word.trim();
     if (!cleanWord) return { isValid: false, chinese: '', errorType: 'INVALID' };
 
-    // Check common words list first (prepositions, conjunctions, etc.)
     const upperWord = cleanWord.toUpperCase();
+
+    // 1. Minimum Length Multi-check: 
+    // - Only 'A' and 'I' allowed for single letters
+    if (upperWord.length === 1 && upperWord !== 'A' && upperWord !== 'I') {
+        return { isValid: false, chinese: '', errorType: 'INVALID' };
+    }
+
+    // - Strict whitelist for 2-letter words (Intercepts "NI", "LI", etc.)
+    if (upperWord.length === 2 && !CORE_2_LETTER_WORDS.has(upperWord)) {
+        return { isValid: false, chinese: '', errorType: 'INVALID' };
+    }
+
+    // 2. Profanity Filter
+    if (isProfane(upperWord)) {
+        return { isValid: false, chinese: '涉嫌色情、低俗或敏感词汇', errorType: 'INVALID' };
+    }
+
+    // Check common words list (includes some prepositions, conjunctions, etc.)
     if (COMMON_WORDS.has(upperWord)) {
         const chinese = COMMON_WORDS.get(upperWord) || '';
+
+        // If it's a known abbreviation in our local list (heuristic)
+        // BYPASS check if word is in whitelist
+        if (!ABBREVIATION_WHITELIST.has(upperWord) && ABBR_KEYWORDS.some(k => chinese.includes(k))) {
+            return { isValid: false, chinese: '', errorType: 'INVALID' };
+        }
+
         return { isValid: true, chinese };
     }
 
@@ -91,7 +133,14 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
 
             if (isProp) return { isValid: false, chinese: '', errorType: 'PROPER_NOUN' };
 
-            // 2. Fetch Chinese definition from Youdao
+            // 3. Abbreviation Check (Free Dictionary meanings often contain "abbreviation")
+            const isAbbr = firstEntry.meanings.some((m: any) =>
+                m.partOfSpeech.toLowerCase().includes('abbreviation') ||
+                m.definitions.some((d: any) => d.definition.toLowerCase().includes('short for'))
+            );
+            if (isAbbr) return { isValid: false, chinese: '', errorType: 'INVALID' };
+
+            // 4. Fetch Chinese definition from Youdao
             let chineseDef = '';
             try {
                 const isNative = Capacitor.isNativePlatform();
@@ -116,6 +165,12 @@ export async function checkWordDefinition(word: string): Promise<WordResult> {
 
                 if (data?.data?.entries && data.data.entries.length > 0) {
                     chineseDef = data.data.entries[0].explain;
+
+                    // Youdao side abbreviation check
+                    // BYPASS check if word is in whitelist
+                    if (!ABBREVIATION_WHITELIST.has(upperWord) && ABBR_KEYWORDS.some(k => chineseDef.includes(k))) {
+                        return { isValid: false, chinese: chineseDef, errorType: 'INVALID' };
+                    }
                 }
             } catch (e) {
                 console.error('Youdao API failed:', e);
@@ -205,10 +260,11 @@ export async function fetchNewPresets(): Promise<string[]> {
                 }
                 return { word, freq };
             })
-            .filter(item =>
+            .filter((item: any) =>
                 item.word.length >= 6 &&
                 item.word.length <= 12 &&
-                /^[A-Z]+$/.test(item.word) // valid letters only
+                /^[A-Z]+$/.test(item.word) &&
+                !isProfane(item.word)
             );
 
         // Sort by frequency descending (Common words first)
@@ -245,7 +301,7 @@ export async function findValidHint(sourceWord: string, usedWords: Set<string>):
         for (const [word] of COMMON_WORDS.entries()) {
             const uword = word.toUpperCase();
             const isAllowedSingle = uword === 'A' || uword === 'I';
-            if ((uword.length >= 2 || isAllowedSingle) && uword.length <= 12 && uword !== s && !usedWords.has(uword) && canConstruct(uword, s)) {
+            if ((uword.length >= 2 || isAllowedSingle) && uword.length <= 12 && uword !== s && !usedWords.has(uword) && canConstruct(uword, s) && !isProfane(uword)) {
                 localCandidates.push({ word: uword, freq: 5000 });
             }
         }
@@ -284,6 +340,7 @@ export async function findValidHint(sourceWord: string, usedWords: Set<string>):
             if (usedWords.has(word)) continue;
             if (COMMON_WORDS.has(word)) continue; // Already handled in Step 1
             if (!/^[A-Z]+$/.test(word)) continue;
+            if (isProfane(word)) continue;
 
             if (canConstruct(word, s)) {
                 const validation = await checkWordDefinition(word);
