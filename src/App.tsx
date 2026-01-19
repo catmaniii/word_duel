@@ -100,12 +100,21 @@ function App() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [adErrorMessage, setAdErrorMessage] = useState('');
 
-  // Auto-scroll history to bottom
+  // Auto-scroll history container manually
+  const historyContainerRef = useRef<HTMLDivElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (historyEndRef.current) {
-      historyEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    const scrollToBottom = () => {
+      if (historyEndRef.current) {
+        historyEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
+      } else if (historyContainerRef.current) {
+        historyContainerRef.current.scrollTop = historyContainerRef.current.scrollHeight;
+      }
+    };
+
+    // One-time execution with a small delay for layout stability
+    const timer = setTimeout(scrollToBottom, 50);
+    return () => clearTimeout(timer);
   }, [history]);
 
   // Styles for dynamic background
@@ -447,14 +456,21 @@ function App() {
 
   return (
     <div style={{
-      width: '100%',
+      width: '100vw',
       height: '100vh',
       maxWidth: '1200px',
       margin: '0 auto',
-      padding: 'env(safe-area-inset-top) 0 0 0', // Safe area for mobile status bar/notches
+      padding: 0,
       display: 'flex',
       flexDirection: 'column',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+      position: 'fixed',
+      top: 0,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: 'var(--player-bg)',
+      color: '#333'
     }}>
 
       {!isGameStarted ? (
@@ -672,7 +688,16 @@ function App() {
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          width: '100%',
+          height: '100%',
+          background: 'var(--player-bg)',
+          minHeight: 0
+        }}>
           {/* MOBILE SIDEBAR OVERLAY */}
           {showMobileLog && (
             <div className="mobile-sidebar-overlay" onClick={() => setShowMobileLog(false)}>
@@ -689,13 +714,12 @@ function App() {
 
           {/* 1. TOP BAR: Global First Line */}
           <div style={{
-            padding: '0.5rem 1rem',
+            padding: 'calc(env(safe-area-inset-top) + 0.5rem) 1rem 0.5rem 1rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexShrink: 0,
             width: '100%',
-            height: '50px', // Fixed height for consistency
             boxSizing: 'border-box',
             background: '#ffffff',
             borderBottom: '1px solid rgba(0,0,0,0.1)',
@@ -771,136 +795,119 @@ function App() {
             flex: 1,
             gap: '1.25rem',
             overflow: 'hidden',
-            padding: '2rem 1rem 1rem 1rem' // Further increased top padding (2rem)
+            padding: '1rem',
+            width: '100%',
+            height: '100%',
+            boxSizing: 'border-box',
+            minHeight: 0
           }}>
             {/* SIDEBAR: Compact List */}
-            <div className="desktop-sidebar">
+            <div className="desktop-sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <SidebarList history={history} />
               {!Capacitor.isNativePlatform() && (
-                <div style={{ marginTop: '1rem', minHeight: '250px' }}>
+                <div style={{ marginTop: '1.5rem', minHeight: '250px', flexShrink: 0 }}>
                   <AdSenseUnit slot="9240397827" format="vertical" />
                 </div>
               )}
             </div>
 
-            {/* MAIN COLUMN */}
+            {/* MAIN COLUMN: Handles internal history scrolling and pinned bottom controls */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* 2. PLAYER INDICATORS */}
               <div style={{ flexShrink: 0, padding: '0 1rem', marginBottom: '0.5rem' }}>
                 <PlayerStatus playerCount={playerCount} currentPlayer={currentPlayer} eliminatedPlayers={eliminatedPlayers} />
               </div>
 
-              {/* 3. DIALOG BOX (History) */}
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '0 1rem',
-                margin: '0.25rem 0'
-              }}>
-                <HistoryList history={history} />
-                <div ref={historyEndRef} />
+              {/* 3. DIALOG BOX (History) - Fills remaining space and scrolls */}
+              <div
+                ref={historyContainerRef}
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  padding: '0 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  WebkitOverflowScrolling: 'touch'
+                }}>
+                <div style={{ flex: '1 0 0px' }} /> {/* Spacer allows shrinking to 0, but pushes content down */}
+                <div style={{ flexShrink: 0 }}>
+                  <HistoryList history={history} />
+                </div>
+                <div ref={historyEndRef} style={{ height: '1px', flexShrink: 0 }} />
               </div>
 
-              {/* 4. SOURCE WORD - Floating Definition Reveal */}
-              <div style={{ textAlign: 'center', padding: '0.1rem', flexShrink: 0, position: 'relative' }}>
-                <div
-                  onMouseEnter={() => setShowSourceDef(true)}
-                  onMouseLeave={() => setShowSourceDef(false)}
-                  onPointerDown={() => setShowSourceDef(true)}
-                  onPointerUp={() => setShowSourceDef(false)}
-                  onPointerCancel={() => setShowSourceDef(false)}
-                  style={{
-                    fontSize: 'clamp(1.8rem, 8vw, 2.6rem)',
-                    fontWeight: '950',
-                    letterSpacing: '0.3rem',
-                    color: '#1a1a1a',
-                    textShadow: '2px 2px 0px #fff, 4px 4px 0px rgba(0,0,0,0.1)',
-                    whiteSpace: 'nowrap',
-                    display: 'inline-block',
-                    margin: '0 auto',
-                    cursor: 'help', // "Help" cursor indicates info on hover
-                    userSelect: 'none',
-                    transition: 'transform 0.2s'
-                  }}
-                >
-                  {sourceWord}
+              <div style={{
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '0.5rem 0 calc(env(safe-area-inset-bottom) + 0.5rem) 0'
+              }}>
+                {/* 4. SOURCE WORD */}
+                <div style={{ textAlign: 'center', padding: '0.2rem', position: 'relative' }}>
+                  <div
+                    onMouseEnter={() => setShowSourceDef(true)}
+                    onMouseLeave={() => setShowSourceDef(false)}
+                    onPointerDown={() => setShowSourceDef(true)}
+                    onPointerUp={() => setShowSourceDef(false)}
+                    onPointerCancel={() => setShowSourceDef(false)}
+                    style={{
+                      fontSize: 'clamp(1.8rem, 8vw, 2.6rem)',
+                      fontWeight: '950',
+                      letterSpacing: '0.3rem',
+                      color: '#111',
+                      textShadow: '1px 1px 0px rgba(255,255,255,0.8)',
+                      cursor: 'help',
+                      userSelect: 'none'
+                    }}
+                  >
+                    {sourceWord}
+                  </div>
+
+                  {showSourceDef && sourceWordDef && (
+                    <div style={{
+                      position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)',
+                      background: 'rgba(0,0,0,0.85)', color: 'white', padding: '8px 16px', borderRadius: '12px',
+                      fontSize: '0.85rem', zIndex: 100, pointerEvents: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                    }}>
+                      {sourceWordDef}
+                    </div>
+                  )}
                 </div>
 
-                {/* Floating Tooltip-style Definition */}
-                {showSourceDef && sourceWordDef && (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '110%', // Position above the word
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 100,
-                    width: 'max-content',
-                    maxWidth: '280px',
-                    fontSize: '0.85rem',
-                    color: '#fff',
-                    background: 'rgba(50,50,50,0.95)', // Darker theme for tooltip feel
-                    padding: '6px 14px',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    animation: 'fadeInDown 0.2s ease-out',
-                    wordBreak: 'break-word',
-                    pointerEvents: 'none' // Don't block mouse
-                  }}>
-                    {sourceWordDef}
-                    {/* Tiny arrow */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: '50%',
-                      marginLeft: '-5px',
-                      borderWidth: '5px',
-                      borderStyle: 'solid',
-                      borderColor: 'rgba(50,50,50,0.95) transparent transparent transparent'
-                    }} />
-                  </div>
-                )}
-              </div>
+                {/* 5. LETTER POOL */}
+                <div style={{ padding: '0 0.5rem', marginBottom: '0.5rem' }}>
+                  <LetterPool
+                    sourceWord={sourceWord}
+                    currentInput={inputValue}
+                    onLetterClick={(char) => setInputValue(prev => prev + char)}
+                    onBackspace={() => setInputValue(prev => prev.slice(0, -1))}
+                    onClear={() => setInputValue('')}
+                  />
+                </div>
 
-              {/* 5. LETTER POOL */}
-              <div style={{ padding: '0 0.5rem', flexShrink: 0 }}>
-                <LetterPool
-                  sourceWord={sourceWord}
-                  currentInput={inputValue}
-                  onLetterClick={(char) => setInputValue(prev => prev + char)}
-                  onBackspace={() => setInputValue(prev => prev.slice(0, -1))}
-                  onClear={() => setInputValue('')}
-                />
-              </div>
-
-              {/* 6. INPUT AREA (and status) */}
-              <div className="glass-panel" style={{
-                padding: '0.5rem',
-                flexShrink: 0,
-                margin: '0.2rem',
-                marginTop: 0,
-                background: 'rgba(255,255,255,0.6)'
-              }}>
-                {statusMsg && (
-                  <div style={{
-                    color: '#d32f2f',
-                    textAlign: 'center',
-                    marginBottom: '4px',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold'
-                  }}>
-                    {statusMsg}
-                  </div>
-                )}
-                <InputArea
-                  sourceWord={sourceWord}
-                  value={inputValue}
-                  onChange={setInputValue}
-                  onSubmit={handleSubmitGuess}
-                  isLoading={isLoading}
-                  onRequestHint={handleRequestHint}
-                  onSurrender={handleSurrender}
-                  isHintBlinking={isHintBlinking}
-                />
+                {/* 6. INPUT AREA */}
+                <div className="glass-panel" style={{
+                  padding: '0.5rem',
+                  margin: '0 0.5rem',
+                  background: 'rgba(255,255,255,0.4)',
+                  borderRadius: '16px'
+                }}>
+                  {statusMsg && (
+                    <div style={{ color: '#d32f2f', textAlign: 'center', marginBottom: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                      {statusMsg}
+                    </div>
+                  )}
+                  <InputArea
+                    sourceWord={sourceWord}
+                    value={inputValue}
+                    onChange={setInputValue}
+                    onSubmit={handleSubmitGuess}
+                    isLoading={isLoading}
+                    onRequestHint={handleRequestHint}
+                    onSurrender={handleSurrender}
+                    isHintBlinking={isHintBlinking}
+                  />
+                </div>
               </div>
             </div>
           </div>
